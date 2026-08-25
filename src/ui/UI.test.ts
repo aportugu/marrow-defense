@@ -40,7 +40,10 @@ function setup() {
 }
 
 describe('UI', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it('renders five accessible abilities and handles build/ability shortcuts', () => {
     const { game } = setup();
@@ -62,6 +65,55 @@ describe('UI', () => {
     expect(game.useAbility).toHaveBeenCalledWith('stemcell');
   });
 
+  it('maps pointer taps to canvas coordinates for touch placement', () => {
+    const { game } = setup();
+    game.buildType = 'bcma';
+    vi.spyOn(game.canvas, 'getBoundingClientRect').mockReturnValue({
+      x: 10, y: 20, left: 10, top: 20, right: 650, bottom: 380,
+      width: 640, height: 360, toJSON: () => ({}),
+    });
+    game.canvas.dispatchEvent(new MouseEvent('pointerup', {
+      bubbles: true,
+      clientX: 330,
+      clientY: 200,
+    }));
+    expect(game.tryPlace).toHaveBeenCalledWith(640, 360, 'bcma');
+  });
+
+  it('selects a tower with a pointer tap', () => {
+    const { game, state } = setup();
+    state.towers = [{
+      id: 8, type: 'memory', x: 640, y: 360, tier: 0, cd: 0,
+      targetId: null, strength: 1, wavesSurvived: 0, buffPower: 0,
+    }];
+    vi.spyOn(game.canvas, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 640, bottom: 360,
+      width: 640, height: 360, toJSON: () => ({}),
+    });
+    game.canvas.dispatchEvent(new MouseEvent('pointerup', {
+      bubbles: true,
+      clientX: 320,
+      clientY: 180,
+    }));
+    expect(game.selectTower).toHaveBeenCalledWith(8);
+  });
+
+  it('pauses active play behind the portrait rotation guard', () => {
+    const listeners: Array<() => void> = [];
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(orientation: portrait) and (max-width: 500px)',
+      onchange: null,
+      addEventListener: (_type: string, listener: () => void) => listeners.push(listener),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+    const { game } = setup();
+    expect(game.togglePause).toHaveBeenCalledOnce();
+    expect(document.querySelector('.rotate-overlay')?.getAttribute('aria-hidden')).toBe('false');
+    expect(listeners).toHaveLength(1);
+  });
+
   it('refreshes computed tower statistics after an upgrade', () => {
     const { game, state } = setup();
     const tower: Tower = {
@@ -76,6 +128,8 @@ describe('UI', () => {
     game.cb.onSync?.(state);
     expect(document.querySelector('.p-title')?.textContent).toContain('TIER 2');
     expect(document.querySelector('.popup')?.textContent).toContain('142');
+    expect(document.querySelector('.popup')?.classList.contains('tower-sheet')).toBe(true);
+    expect(document.querySelector('.popup .p-unit')).toBeTruthy();
   });
 
   it('exposes a persisted reduced-motion control in settings', () => {

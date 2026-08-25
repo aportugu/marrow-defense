@@ -65,6 +65,9 @@ export class UI {
   private popup: HTMLDivElement;
   private notice: HTMLDivElement;
   private iecPanel: HTMLDivElement;
+  private rotateOverlay: HTMLDivElement;
+  private portraitQuery: MediaQueryList | null = null;
+  private pausedForOrientation = false;
   private meterFill: Record<string, SVGCircleElement> = {};
   private meterVal: Record<string, HTMLElement> = {};
   private meterBox: Record<string, HTMLElement> = {};
@@ -171,7 +174,9 @@ export class UI {
       a.btn.title = def.blurb;
       a.btn.setAttribute('aria-label', `${def.name}: ${def.blurb}`);
       const shortcut = String(ABILITY_IDS.indexOf(id) + 1);
-      a.btn.append(el('span', 'glyph', def.glyph), el('span', 'a-name', `${shortcut} · ${def.name}`), a.state);
+      const name = el('span', 'a-name');
+      name.append(el('span', 'shortcut', `${shortcut} · `), document.createTextNode(def.name));
+      a.btn.append(el('span', 'glyph', def.glyph), name, a.state);
       a.btn.addEventListener('click', () => this.game.useAbility(id));
       abilities.appendChild(a.btn);
     }
@@ -186,18 +191,31 @@ export class UI {
       const ic = el('span', 'p-icon');
       ic.style.background = def.color;
       const shortcut = ['Q', 'W', 'E'][UNIT_IDS.indexOf(u)];
-      b.append(ic, el('span', 'u-name', `${shortcut} · ${def.label}`), el('span', 'u-cost', `${def.cost}`));
+      const name = el('span', 'u-name');
+      name.append(el('span', 'shortcut', `${shortcut} · `), document.createTextNode(def.label));
+      b.append(ic, name, el('span', 'u-cost', `${def.cost}`));
       b.addEventListener('click', () => this.game.setBuildType(u));
       units.appendChild(b);
     }
 
     this.menu = el('div', 'menu hidden');
-    this.popup = el('div', 'popup hidden');
-    screen.append(hud, this.stage, units, abilities, this.menu, this.popup);
+    this.popup = el('div', 'popup tower-sheet hidden');
+    this.popup.setAttribute('role', 'dialog');
+    this.popup.setAttribute('aria-label', 'Selected unit details');
+    this.rotateOverlay = el(
+      'div',
+      'rotate-overlay',
+      '<div class="rotate-card"><div class="rotate-phone" aria-hidden="true">↻</div><strong>Rotate to landscape</strong><span>Marrow Defense is designed for a wider battlefield.</span></div>',
+    );
+    this.rotateOverlay.setAttribute('role', 'status');
+    this.rotateOverlay.setAttribute('aria-live', 'polite');
+    this.rotateOverlay.setAttribute('aria-hidden', 'true');
+    screen.append(hud, this.stage, units, abilities, this.menu, this.popup, this.rotateOverlay);
     app.appendChild(screen);
 
     this.wireCanvas();
     this.wireKeys();
+    this.wireOrientationGuard();
   }
 
   /* ------------------------------------------------ canvas input */
@@ -225,7 +243,7 @@ export class UI {
 
   private wireCanvas(): void {
     const cv = this.canvas;
-    cv.addEventListener('click', (e) => {
+    cv.addEventListener('pointerup', (e) => {
       const { x, y } = this.canvasPos(e);
       const g = this.game;
       if (g.buildType) {
@@ -243,12 +261,13 @@ export class UI {
       if (t) g.selectTower(t.id);
       else g.clearSelection();
     });
-    cv.addEventListener('mousemove', (e) => {
+    cv.addEventListener('pointermove', (e) => {
       const { x, y } = this.canvasPos(e);
       this.game.setCursor(x, y, true);
-      this.updateTooltip(e, x, y);
+      if (e.pointerType === 'mouse' || e.pointerType === 'pen') this.updateTooltip(e, x, y);
+      else this.tooltip.classList.add('hidden');
     });
-    cv.addEventListener('mouseleave', () => {
+    cv.addEventListener('pointerleave', () => {
       this.game.setCursor(0, 0, false);
       this.tooltip.classList.add('hidden');
     });
@@ -257,6 +276,24 @@ export class UI {
       this.game.setBuildType(null);
       this.game.clearSelection();
     });
+  }
+
+  private wireOrientationGuard(): void {
+    if (typeof window.matchMedia !== 'function') return;
+    this.portraitQuery = window.matchMedia('(orientation: portrait) and (max-width: 500px)');
+    this.portraitQuery.addEventListener('change', () => this.updateOrientationGuard(this.game.state));
+    this.updateOrientationGuard(this.game.state);
+  }
+
+  private updateOrientationGuard(s: GameState): void {
+    const portrait = this.portraitQuery?.matches ?? false;
+    this.rotateOverlay.setAttribute('aria-hidden', String(!portrait));
+    if (portrait && s.phase === 'playing' && !this.pausedForOrientation) {
+      this.pausedForOrientation = true;
+      this.game.togglePause();
+    } else if (!portrait) {
+      this.pausedForOrientation = false;
+    }
   }
 
   private enemyTip(type: EnemyTypeId, hpFrac: number): string {
@@ -352,6 +389,7 @@ export class UI {
   /* ------------------------------------------------ per-frame sync */
 
   private sync(s: GameState): void {
+    this.updateOrientationGuard(s);
     for (const m of METER_META) {
       const v = s.meters[m.id];
       this.meterFill[m.id].setAttribute('stroke-dashoffset', String(GAUGE_C * (1 - v / 100)));
