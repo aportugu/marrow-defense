@@ -1,0 +1,148 @@
+import { describe, expect, it } from 'vitest';
+import type { GameState, Tower, UnitTypeId } from '../game/types';
+import { UNIT } from '../game/Balance';
+import { createInitialState, startGame } from '../game/GameState';
+import { buildPath } from '../lib/path';
+import { activate, canActivate, stepAbilities } from './AbilitySystem';
+import { stepEnemies, stepProjectiles, stepTowers } from './CombatSystem';
+import { checkEnd, stepMeters } from './MeterSystem';
+import { stepWave } from './WaveSystem';
+
+const path = buildPath();
+const spots = [
+  [120, 495], [260, 613], [400, 349], [540, 313], [680, 218],
+  [820, 365], [960, 573], [1100, 387],
+  [120, 605], [400, 459], [680, 328], [960, 463],
+] as const;
+
+function addTower(s: GameState, type: UnitTypeId, spot: number): Tower {
+  const [x, y] = spots[spot];
+  const tower: Tower = {
+    id: s.nextId++, type, x, y, tier: 0, cd: 0, targetId: null,
+    strength: type === 'memory' ? 1 : 0, wavesSurvived: 0, buffPower: 0,
+  };
+  s.currency -= UNIT[type].cost;
+  s.towers.push(tower);
+  return tower;
+}
+
+function tick(s: GameState, dt: number): void {
+  if (s.subPhase === 'wave') {
+    stepEnemies(s, dt, path);
+    stepTowers(s, dt);
+    stepProjectiles(s, dt);
+  }
+  stepAbilities(s, dt);
+  stepMeters(s, dt);
+  stepWave(s, dt, path);
+}
+
+function runBalanced(): GameState {
+  const s = createInitialState(11);
+  startGame(s, false);
+  addTower(s, 'bcma', 0);
+  const build: [UnitTypeId, number][] = [
+    ['dual', 2], ['bcma', 5], ['dual', 6], ['memory', 4], ['bcma', 7],
+    ['dual', 1], ['bcma', 3], ['dual', 8], ['bcma', 9], ['dual', 10], ['bcma', 11],
+  ];
+  const upgrades: [number, 0 | 1][] = [
+    [0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [3, 0], [4, 0], [4, 1],
+    [2, 1], [3, 1], [5, 0], [6, 0], [7, 0], [8, 0], [5, 1], [6, 1],
+    [9, 0], [10, 0], [11, 0], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1],
+  ];
+  let buildIndex = 0;
+  let upgradeIndex = 0;
+  let safety = 0;
+  while (s.phase === 'playing' && safety++ < 30000) {
+    const recoveryReserve = s.stats.peakHematotoxicity >= 30
+      ? (!s.abilities.stemcell.used && s.meters.hematotoxicity >= 50 ? 185 : 90)
+      : 0;
+    if (buildIndex < build.length && s.currency >= UNIT[build[buildIndex][0]].cost + recoveryReserve) {
+      addTower(s, ...build[buildIndex]);
+      buildIndex++;
+    } else if (buildIndex >= 2 && upgradeIndex < upgrades.length) {
+      const [towerIndex, tier] = upgrades[upgradeIndex];
+      const tower = s.towers[towerIndex];
+      if (tower && tower.tier === tier) {
+        const cost = UNIT[tower.type].upgrades[tier].cost;
+        if (s.currency >= cost + recoveryReserve) {
+          s.currency -= cost;
+          tower.tier = (tier + 1) as 1 | 2;
+          if (tower.type === 'memory') tower.strength += 0.5;
+          upgradeIndex++;
+        }
+      } else if (tower) {
+        upgradeIndex++;
+      }
+    }
+    if (s.meters.crs >= 60 && canActivate(s, 'toci')) activate(s, 'toci');
+    if ((s.meters.neuro >= 68 || s.meters.hyperinflammation >= 45) && canActivate(s, 'dexa')) activate(s, 'dexa');
+    if (s.meters.hematotoxicity >= 55 && canActivate(s, 'stemcell')) activate(s, 'stemcell');
+    else if (
+      s.meters.hematotoxicity >= 30 &&
+      (s.abilities.stemcell.used || s.meters.hematotoxicity < 55) &&
+      (s.abilities.stemcell.used || s.currency >= 185) &&
+      canActivate(s, 'gcsf')
+    ) activate(s, 'gcsf');
+    if (s.meters.hyperinflammation >= 30 && canActivate(s, 'anakinra')) activate(s, 'anakinra');
+    tick(s, 0.05);
+    const end = checkEnd(s);
+    if (end) s.phase = end;
+  }
+  return s;
+}
+
+describe('full-run balance', () => {
+  it('allows a balanced automated strategy to clear all ten waves', () => {
+    const s = runBalanced();
+    expect(s.phase, JSON.stringify({ wave: s.wave, meters: s.meters, hematotoxicityLoad: s.hematotoxicityLoad, stats: s.stats, towers: s.towers.length })).toBe('won');
+    expect(s.meters.hematotoxicity).toBeLessThan(85);
+    expect(s.stats.peakCrs).toBeLessThan(85);
+    expect(s.stats.peakNeuro).toBeLessThan(85);
+    expect(s.stats.peakHyperinflammation).toBeLessThan(85);
+    expect(s.stats.anakinraUses).toBeGreaterThan(0);
+    expect(s.stats.gcsfUses).toBeGreaterThan(0);
+  });
+
+  it('keeps controlled cumulative exposure below 50 with G-CSF but without Stem-Cell Boost', () => {
+    const s = createInitialState(31);
+    startGame(s, false);
+    s.currency = 1000;
+    s.meters.hematotoxicity = 35;
+    for (let wave = 1; wave <= 10; wave++) {
+      s.subPhase = 'wave';
+      s.meters.crs = 35 + wave * 2;
+      s.meters.burden = 20 + wave * 2;
+      for (let i = 0; i < 400; i++) {
+        if (s.meters.hematotoxicity >= 30 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
+        stepAbilities(s, 0.05);
+        stepMeters(s, 0.05);
+      }
+      s.subPhase = 'planning';
+      for (let i = 0; i < 240; i++) {
+        if (s.meters.hematotoxicity >= 30 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
+        stepAbilities(s, 0.05);
+        stepMeters(s, 0.05);
+      }
+    }
+    expect(s.stats.stemcellUses).toBe(0);
+    expect(s.stats.gcsfUses).toBeGreaterThan(0);
+    expect(s.stats.peakHematotoxicity).toBeGreaterThanOrEqual(30);
+    expect(s.meters.hematotoxicity).toBeLessThan(50);
+  });
+
+  it('makes an unsupported BCMA-only strategy leak heavily by wave eight', () => {
+    const s = createInitialState(12);
+    startGame(s, false);
+    addTower(s, 'bcma', 0);
+    let safety = 0;
+    while (s.phase === 'playing' && s.wave <= 8 && safety++ < 22000) {
+      tick(s, 0.05);
+      const end = checkEnd(s);
+      if (end) s.phase = end;
+    }
+    expect(s.phase === 'lost' || s.stats.escapes >= 10).toBe(true);
+    expect(s.stats.peakHematotoxicity).toBeGreaterThan(65);
+  });
+
+});
