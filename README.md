@@ -63,7 +63,8 @@ open "release/mac-arm64/Marrow Defense.app"
 - **Goal:** survive 10 waves. Leaked cells raise **burden**, add delayed
   **hematotoxicity**, and drain **fitness**. CRS, neurotoxicity, or IEC-HS reaching 100—or
   fitness reaching 0—ends the run. Hematotoxicity impairs recovery and can drain fitness,
-  but does not directly end the run at 100.
+  but does not directly end the run at 100. It accumulates without passive recovery and
+  must be managed with periodic G-CSF or the one-time Stem-Cell Boost.
 - **Building:** select a unit and place it anywhere clear of the marrow stream and other
   units. Click a built unit to purchase either of its two upgrades.
 - **Units:**
@@ -74,12 +75,12 @@ open "release/mac-arm64/Marrow Defense.app"
   - `TOCI` (Tocilizumab) — drops CRS by 40. 55 funding, 28s cooldown.
   - `DEXA` (Dexamethasone) — cuts neurotoxicity and suppresses new CRS for 8s, but
     slows CAR-T attacks and costs fitness.
-  - `STEM` (Stem-Cell Boost) — once per run at hematotoxicity 20+, creates 15 seconds
-    of gradual hematopoietic recovery and protects against hematotoxicity-driven fitness drain.
+  - `STEM` (Stem-Cell Boost) — once per run at hematotoxicity 20+, nearly resolves both
+    visible hematotoxicity and its latent backlog, followed by 10 seconds of recovery.
   - `ANAKINRA` — unlocks during the IEC-HS scenario. It temporarily suppresses new
     hyperinflammation and accelerates recovery; this is a gameplay abstraction, not
     dosing or treatment guidance.
-  - `G-CSF` — repeatable at hematotoxicity 30+, immediately lowers hematotoxicity by 10,
+  - `G-CSF` — repeatable at hematotoxicity 20+, immediately lowers hematotoxicity by 10,
     then provides 6 seconds of brief recovery and partial protection from fitness drain. It costs 45 funding and has
     a 24-second cooldown. These values are gameplay abstractions, not dosing guidance.
 - **Tuning:** `src/game/Balance.ts` — every number lives there.

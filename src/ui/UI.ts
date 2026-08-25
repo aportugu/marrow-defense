@@ -401,7 +401,7 @@ export class UI {
       const concerning = (id === 'toci' && s.meters.crs >= METER.crsWarn) ||
         (id === 'dexa' && (s.meters.neuro >= METER.neuroWarn || s.meters.hyperinflammation >= 55)) ||
         (id === 'stemcell' && s.meters.hematotoxicity >= METER.hematotoxicityWarn) ||
-        (id === 'gcsf' && s.meters.hematotoxicity >= METER.hematotoxicityWarn) ||
+        (id === 'gcsf' && s.meters.hematotoxicity >= GCSF.minHematotoxicity) ||
         (id === 'anakinra' && s.iecHsActive);
       a.btn.classList.toggle('hint', can && concerning);
       a.state.textContent =

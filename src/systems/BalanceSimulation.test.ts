@@ -37,8 +37,10 @@ function tick(s: GameState, dt: number): void {
   stepWave(s, dt, path);
 }
 
-function runBalanced(): GameState {
+function runBalanced(): { state: GameState; firstGcsfWave: number | null; gcsfWaves: Set<number> } {
   const s = createInitialState(11);
+  let firstGcsfWave: number | null = null;
+  const gcsfWaves = new Set<number>();
   startGame(s, false);
   addTower(s, 'bcma', 0);
   const build: [UnitTypeId, number][] = [
@@ -54,7 +56,7 @@ function runBalanced(): GameState {
   let upgradeIndex = 0;
   let safety = 0;
   while (s.phase === 'playing' && safety++ < 30000) {
-    const recoveryReserve = s.stats.peakHematotoxicity >= 30
+    const recoveryReserve = s.stats.peakHematotoxicity >= 20
       ? (!s.abilities.stemcell.used && s.meters.hematotoxicity >= 50 ? 185 : 90)
       : 0;
     if (buildIndex < build.length && s.currency >= UNIT[build[buildIndex][0]].cost + recoveryReserve) {
@@ -79,32 +81,39 @@ function runBalanced(): GameState {
     if ((s.meters.neuro >= 68 || s.meters.hyperinflammation >= 45) && canActivate(s, 'dexa')) activate(s, 'dexa');
     if (s.meters.hematotoxicity >= 55 && canActivate(s, 'stemcell')) activate(s, 'stemcell');
     else if (
-      s.meters.hematotoxicity >= 30 &&
+      s.meters.hematotoxicity >= 20 &&
       (s.abilities.stemcell.used || s.meters.hematotoxicity < 55) &&
       (s.abilities.stemcell.used || s.currency >= 185) &&
       canActivate(s, 'gcsf')
-    ) activate(s, 'gcsf');
+    ) {
+      firstGcsfWave ??= s.wave;
+      gcsfWaves.add(s.wave);
+      activate(s, 'gcsf');
+    }
     if (s.meters.hyperinflammation >= 30 && canActivate(s, 'anakinra')) activate(s, 'anakinra');
     tick(s, 0.05);
     const end = checkEnd(s);
     if (end) s.phase = end;
   }
-  return s;
+  return { state: s, firstGcsfWave, gcsfWaves };
 }
 
 describe('full-run balance', () => {
   it('allows a balanced automated strategy to clear all ten waves', () => {
-    const s = runBalanced();
+    const { state: s, firstGcsfWave, gcsfWaves } = runBalanced();
     expect(s.phase, JSON.stringify({ wave: s.wave, meters: s.meters, hematotoxicityLoad: s.hematotoxicityLoad, stats: s.stats, towers: s.towers.length })).toBe('won');
     expect(s.meters.hematotoxicity).toBeLessThan(85);
     expect(s.stats.peakCrs).toBeLessThan(85);
     expect(s.stats.peakNeuro).toBeLessThan(85);
     expect(s.stats.peakHyperinflammation).toBeLessThan(85);
     expect(s.stats.anakinraUses).toBeGreaterThan(0);
-    expect(s.stats.gcsfUses).toBeGreaterThan(0);
+    expect(s.stats.gcsfUses).toBeGreaterThanOrEqual(3);
+    expect(firstGcsfWave).not.toBeNull();
+    expect(firstGcsfWave!).toBeLessThanOrEqual(4);
+    expect(gcsfWaves.size).toBeGreaterThanOrEqual(3);
   });
 
-  it('keeps controlled cumulative exposure below 50 with G-CSF but without Stem-Cell Boost', () => {
+  it('keeps cumulative exposure controlled with periodic G-CSF but without Stem-Cell Boost', () => {
     const s = createInitialState(31);
     startGame(s, false);
     s.currency = 1000;
@@ -114,20 +123,20 @@ describe('full-run balance', () => {
       s.meters.crs = 35 + wave * 2;
       s.meters.burden = 20 + wave * 2;
       for (let i = 0; i < 400; i++) {
-        if (s.meters.hematotoxicity >= 30 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
+        if (s.meters.hematotoxicity >= 20 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
         stepAbilities(s, 0.05);
         stepMeters(s, 0.05);
       }
       s.subPhase = 'planning';
       for (let i = 0; i < 240; i++) {
-        if (s.meters.hematotoxicity >= 30 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
+        if (s.meters.hematotoxicity >= 20 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
         stepAbilities(s, 0.05);
         stepMeters(s, 0.05);
       }
     }
     expect(s.stats.stemcellUses).toBe(0);
     expect(s.stats.gcsfUses).toBeGreaterThan(0);
-    expect(s.stats.peakHematotoxicity).toBeGreaterThanOrEqual(30);
+    expect(s.stats.peakHematotoxicity).toBeGreaterThanOrEqual(20);
     expect(s.meters.hematotoxicity).toBeLessThan(50);
   });
 

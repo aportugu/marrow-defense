@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, startGame } from '../game/GameState';
-import { ECONOMY, GCSF, METER } from '../game/Balance';
+import { GCSF, METER } from '../game/Balance';
 import { checkEnd, stepMeters } from './MeterSystem';
 
 function fresh() {
@@ -11,9 +11,8 @@ function fresh() {
 
 describe('stepMeters', () => {
   it('uses the stronger delayed hematotoxicity pressure profile', () => {
-    expect(METER.hematotoxicityExposure).toEqual({ crs: 0.26, hyperinflammation: 0.45, burden: 0.16 });
-    expect(METER.hematotoxicityRecoveryWave).toBe(0.02);
-    expect(METER.hematotoxicityRecoveryPlanning).toBe(0.25);
+    expect(METER.hematotoxicityExposure).toEqual({ crs: 0.42, hyperinflammation: 0.62, burden: 0.26 });
+    expect(METER.hematotoxicityRelease).toBe(0.18);
     expect(METER.hematotoxicityFitnessThreshold).toBe(50);
     expect(METER.hematotoxicityFitnessDrainMax).toBe(0.5);
   });
@@ -64,8 +63,8 @@ describe('stepMeters', () => {
     s.meters.hematotoxicity = 20;
     s.hematotoxicityLoad = 10;
     stepMeters(s, 1);
-    expect(s.meters.hematotoxicity).toBeCloseTo(20 + 1.2 - METER.hematotoxicityRecoveryPlanning);
-    expect(s.hematotoxicityLoad).toBeCloseTo(8.8);
+    expect(s.meters.hematotoxicity).toBeCloseTo(21.8);
+    expect(s.hematotoxicityLoad).toBeCloseTo(8.2);
   });
 
   it('CRS, IEC-HS, and burden accumulate latent hematotoxicity exposure', () => {
@@ -78,7 +77,7 @@ describe('stepMeters', () => {
     expect(s.hematotoxicityLoad).toBeGreaterThan(0);
   });
 
-  it('tier-two Memory cells improve planning hematotoxicity recovery with a cap', () => {
+  it('does not passively recover hematotoxicity during planning or from Memory cells', () => {
     const s = fresh();
     s.meters.hematotoxicity = 50;
     s.towers = [0, 1, 2].map((id) => ({
@@ -86,9 +85,7 @@ describe('stepMeters', () => {
       targetId: null, strength: 1, wavesSurvived: 0, buffPower: 0,
     }));
     stepMeters(s, 1);
-    expect(s.meters.hematotoxicity).toBeCloseTo(
-      50 - METER.hematotoxicityRecoveryPlanning - ECONOMY.memoryHematotoxicityCap,
-    );
+    expect(s.meters.hematotoxicity).toBe(50);
   });
 
   it('models IEC-HS independently of falling CRS and derives its trajectory', () => {

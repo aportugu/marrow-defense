@@ -21,18 +21,10 @@ export function stepMeters(s: GameState, dt: number): void {
   ) * dt;
   const released = s.hematotoxicityLoad * METER.hematotoxicityRelease * dt;
   s.hematotoxicityLoad = Math.max(0, s.hematotoxicityLoad - released);
-  const memoryRecovery = s.subPhase === 'planning' ? Math.min(
-    ECONOMY.memoryHematotoxicityCap,
-    s.towers.filter((t) => t.type === 'memory' && t.tier >= 2).length * ECONOMY.memoryHematotoxicityPerSec,
-  ) : 0;
   const recovering = s.stats.time < s.stemCellRecoveryUntil;
   const gcsfSupport = s.stats.time < s.gcsfUntil;
-  const hematotoxicityRecovery = s.subPhase === 'wave'
-    ? METER.hematotoxicityRecoveryWave
-    : METER.hematotoxicityRecoveryPlanning + memoryRecovery;
   m.hematotoxicity = clamp(
     m.hematotoxicity + released - (
-      hematotoxicityRecovery +
       (recovering ? STEMCELL.recoveryPerSec : 0) +
       (gcsfSupport ? GCSF.recoveryPerSec : 0)
     ) * dt,

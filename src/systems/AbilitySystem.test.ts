@@ -77,20 +77,22 @@ describe('AbilitySystem', () => {
     expect(s.meters.hyperinflammation).toBe(55);
   });
 
-  it('stem-cell boost requires hematotoxicity and starts timed recovery without an instant drop', () => {
+  it('stem-cell boost requires hematotoxicity and immediately provides a near-reset', () => {
     const s = fresh();
     s.currency = 300;
     expect(canActivate(s, 'stemcell')).toBe(false);
     s.meters.hematotoxicity = 40;
     s.meters.fitness = 80;
+    s.hematotoxicityLoad = 10;
     expect(canActivate(s, 'stemcell')).toBe(true);
     activate(s, 'stemcell');
     expect(s.abilities.stemcell.used).toBe(true);
-    expect(s.meters.hematotoxicity).toBe(40);
+    expect(s.meters.hematotoxicity).toBe(0);
+    expect(s.hematotoxicityLoad).toBe(1);
     expect(s.meters.fitness).toBe(80);
     expect(s.stemCellRecoveryUntil).toBe(s.stats.time + STEMCELL.duration);
     stepMeters(s, 1);
-    expect(s.meters.hematotoxicity).toBeLessThan(40);
+    expect(s.meters.hematotoxicity).toBe(0);
     expect(canActivate(s, 'stemcell')).toBe(false);
   });
 
@@ -103,16 +105,17 @@ describe('AbilitySystem', () => {
     expect(canActivate(s, 'stemcell')).toBe(false);
   });
 
-  it('Stem-Cell recovery lasts 15 seconds and does not block latent exposure', () => {
+  it('Stem-Cell recovery clears most latent injury and lasts for its recovery window', () => {
     const s = fresh();
     s.currency = 300;
     s.meters.hematotoxicity = 50;
     s.hematotoxicityLoad = 10;
     activate(s, 'stemcell');
-    for (let i = 0; i < 300; i++) stepMeters(s, 0.05);
+    expect(s.hematotoxicityLoad).toBe(1);
+    for (let i = 0; i < STEMCELL.duration * 20; i++) stepMeters(s, 0.05);
     expect(s.stats.time).toBeCloseTo(STEMCELL.duration);
     expect(s.hematotoxicityLoad).toBeGreaterThan(0);
-    expect(s.meters.hematotoxicity).toBeLessThan(50);
+    expect(s.meters.hematotoxicity).toBe(0);
   });
 
   it('G-CSF is repeatable, threshold-gated, and provides immediate plus timed recovery', () => {
@@ -126,6 +129,7 @@ describe('AbilitySystem', () => {
     activate(s, 'gcsf');
     expect(s.currency).toBe(300 - ABILITY.gcsf.cost);
     expect(s.meters.hematotoxicity).toBe(before - GCSF.hematotoxicityDrop);
+    expect(s.hematotoxicityLoad).toBe(10 * GCSF.latentLoadMultiplier);
     expect(s.gcsfUntil).toBe(s.stats.time + GCSF.duration);
     expect(s.abilities.gcsf.cooldown).toBe(ABILITY.gcsf.cooldown);
     expect(s.stats.gcsfUses).toBe(1);

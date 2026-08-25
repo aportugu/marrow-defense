@@ -193,7 +193,7 @@ describe('UI', () => {
   it('highlights G-CSF for ICAHT pressure and shows its active status', () => {
     const { game, state } = setup();
     state.currency = 300;
-    state.meters.hematotoxicity = 55;
+    state.meters.hematotoxicity = 20;
     game.cb.onSync?.(state);
     expect(document.querySelector('.a-gcsf')?.classList.contains('hint')).toBe(true);
     state.gcsfUntil = state.stats.time + 6;
@@ -204,8 +204,8 @@ describe('UI', () => {
 
   it('shows the G-CSF hematotoxicity requirement while unavailable', () => {
     const { game, state } = setup();
-    state.meters.hematotoxicity = 20;
+    state.meters.hematotoxicity = 19;
     game.cb.onSync?.(state);
-    expect(document.querySelector('.a-gcsf .a-state')?.textContent).toBe('HEM 30+');
+    expect(document.querySelector('.a-gcsf .a-state')?.textContent).toBe('HEM 20+');
   });
 });
