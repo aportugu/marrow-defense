@@ -13,6 +13,7 @@ function setup() {
     canvas: document.createElement('canvas'),
     state,
     cb: {},
+    hasEnteredMenu: true,
     settings: { sound: true, music: true, musicVolume: 0.6, sfxVolume: 0.6, speed: 1, reducedMotion: false, tutorialSeen: true },
     highScore: 0,
     buildType: null,
@@ -28,6 +29,7 @@ function setup() {
     clearSelection: vi.fn(),
     upgradeSelected: vi.fn(),
     begin: vi.fn(),
+    enterMenu: vi.fn(),
     toMenu: vi.fn(),
     setSettings: vi.fn(),
     loseReason: vi.fn(() => 'lost'),
@@ -95,6 +97,34 @@ describe('UI', () => {
     expect(document.querySelector('#intro-cutscene-description')?.textContent).toContain('leukapheresis');
     expect(game.canvas.getAttribute('aria-hidden')).toBe('true');
     expect(document.activeElement?.textContent).toBe('Start run');
+  });
+
+  it('requires an accessible entry click before revealing the main menu', () => {
+    const { game, state } = setup();
+    game.hasEnteredMenu = false;
+    state.phase = 'menu';
+    game.cb.onSync?.(state);
+
+    const enter = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Enter · Start Music');
+    expect(enter).toBeTruthy();
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start run')).toBe(false);
+    expect(document.querySelector('.entry-card')?.getAttribute('aria-describedby')).toBe('entry-cutscene-description');
+
+    enter?.click();
+    expect(game.enterMenu).toHaveBeenCalledOnce();
+
+    game.hasEnteredMenu = true;
+    game.cb.onSync?.(state);
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start run')).toBe(true);
+  });
+
+  it('does not promise music on entry when music is disabled', () => {
+    const { game, state } = setup();
+    game.hasEnteredMenu = false;
+    game.settings.music = false;
+    state.phase = 'menu';
+    game.cb.onSync?.(state);
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Enter Main Menu')).toBe(true);
   });
 
   it('exposes independent music and effects volume controls', () => {

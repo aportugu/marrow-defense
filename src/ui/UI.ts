@@ -17,7 +17,7 @@ import { canActivate } from '../systems/AbilitySystem';
 import { computedTowerStats } from '../systems/CombatSystem';
 import { GLOSSARY, REFERENCES, WAVE_TITLES } from '../data/education';
 
-type MenuKind = 'start' | 'pause' | 'win' | 'lose' | 'glossary' | 'settings';
+type MenuKind = 'entry' | 'start' | 'pause' | 'win' | 'lose' | 'glossary' | 'settings';
 
 const METER_META: { id: 'burden' | 'crs' | 'neuro' | 'fitness' | 'hematotoxicity'; label: string }[] = [
   { id: 'burden', label: 'Burden' },
@@ -475,6 +475,9 @@ export class UI {
   private menuAction(act: string): void {
     const g = this.game;
     switch (act) {
+      case 'enter':
+        g.enterMenu();
+        break;
       case 'begin':
       case 'restart':
         this.nav = null;
@@ -517,7 +520,27 @@ export class UI {
       actions.appendChild(b);
     };
 
-    if (kind === 'start') {
+    if (kind === 'entry') {
+      card.classList.add('entry-card');
+      const description = el(
+        'p',
+        'sr-only',
+        'Opening frame of the CAR-T journey, ready to begin with synchronized music and animation.',
+      );
+      description.id = 'entry-cutscene-description';
+      card.setAttribute('aria-describedby', description.id);
+      card.append(
+        el('h1', undefined, 'MARROW DEFENSE'),
+        el('p', 'tag', 'A CAR-T tower defense'),
+        description,
+      );
+      addBtn(g.settings.music ? 'Enter · Start Music' : 'Enter Main Menu', 'enter');
+      card.append(el(
+        'p',
+        'keys',
+        g.settings.music ? 'Begin the cinematic experience' : 'Music is currently disabled in Settings',
+      ));
+    } else if (kind === 'start') {
       card.classList.add('start-card');
       const description = el(
         'p',
@@ -662,7 +685,7 @@ export class UI {
       this.lastPhase = s.phase;
     }
     let kind: MenuKind | null = null;
-    if (s.phase === 'menu') kind = this.nav ?? 'start';
+    if (s.phase === 'menu') kind = this.game.hasEnteredMenu ? this.nav ?? 'start' : 'entry';
     else if (s.phase === 'paused') kind = this.nav ?? 'pause';
     else if (s.phase === 'won') kind = 'win';
     else if (s.phase === 'lost') kind = 'lose';
@@ -674,10 +697,12 @@ export class UI {
       this.lastMenuKey = '';
       return;
     }
-    this.menu.classList.toggle('menu-start', kind === 'start');
-    if (kind === 'start') this.menu.dataset.introScene = String(this.game.introScene);
+    const isOpening = kind === 'entry' || kind === 'start';
+    this.menu.classList.toggle('menu-start', isOpening);
+    this.menu.classList.toggle('menu-entry', kind === 'entry');
+    if (isOpening) this.menu.dataset.introScene = String(this.game.introScene);
     else delete this.menu.dataset.introScene;
-    if (kind === 'start') this.canvas.setAttribute('aria-hidden', 'true');
+    if (isOpening) this.canvas.setAttribute('aria-hidden', 'true');
     else this.canvas.removeAttribute('aria-hidden');
     const menuKey = `${kind}:${s.lastWaveReport?.wave ?? ''}`;
     if (menuKey !== this.lastMenuKey) {

@@ -393,6 +393,11 @@ input:focus-visible {
   backdrop-filter: none;
 }
 
+.menu.menu-entry {
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(25, 9, 21, 0.68), rgba(8, 2, 6, 0.9));
+}
+
 .menu-card {
   width: min(560px, 92%);
   max-height: 92%;
@@ -410,6 +415,19 @@ input:focus-visible {
   border-color: var(--intro-accent, rgba(176, 67, 214, 0.48));
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34), 0 0 34px var(--intro-glow, rgba(176, 67, 214, 0.12));
   transition: border-color .7s ease, box-shadow .7s ease;
+}
+
+.menu-card.entry-card {
+  width: min(520px, 88%);
+  padding: clamp(32px, 6vw, 58px);
+  background: rgba(17, 6, 15, 0.88);
+  border-color: rgba(165, 243, 252, 0.58);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.5), 0 0 48px rgba(34, 211, 238, 0.14);
+}
+
+.entry-card h1 {
+  font-size: clamp(30px, 5vw, 48px);
+  text-shadow: 0 0 28px rgba(165, 243, 252, 0.28);
 }
 
 .menu-start[data-intro-scene="0"] { --intro-accent: rgba(244, 114, 182, .52); --intro-glow: rgba(244, 114, 182, .13); }

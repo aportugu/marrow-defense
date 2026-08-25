@@ -59,6 +59,7 @@ export class Game {
   iecHsWasActive = false;
   settings: Settings;
   highScore: number;
+  hasEnteredMenu = false;
   selectedTower: number | null = null;
   buildType: UnitTypeId | null = null;
   cursor: Vec | null = null;
@@ -80,9 +81,6 @@ export class Game {
     this.settings = loadSettings();
     this.sound.applySettings(this.settings);
     this.music.applySettings(this.settings);
-    // Start immediately where autoplay is permitted. Browsers that suspend
-    // WebAudio are resumed by the first pointer or keyboard interaction below.
-    this.music.unlock();
     this.highScore = loadHighScore();
     document.documentElement.classList.toggle('reduce-motion', this.settings.reducedMotion);
 
@@ -94,10 +92,6 @@ export class Game {
     this.ctx = c;
     this.ctx.scale(dpr, dpr);
     this.last = typeof performance !== 'undefined' ? performance.now() : 0;
-    if (typeof window !== 'undefined') {
-      window.addEventListener('pointerdown', this.unlockHomeAudio, { once: true });
-      window.addEventListener('keydown', this.unlockHomeAudio, { once: true });
-    }
     if (typeof requestAnimationFrame !== 'undefined') {
       this.raf = requestAnimationFrame(this.frame);
     }
@@ -116,18 +110,7 @@ export class Game {
   stop(): void {
     if (this.raf) cancelAnimationFrame(this.raf);
     this.music.dispose();
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('pointerdown', this.unlockHomeAudio);
-      window.removeEventListener('keydown', this.unlockHomeAudio);
-    }
   }
-
-  private unlockHomeAudio = (): void => {
-    this.music.unlock();
-    this.sound.ensure();
-    window.removeEventListener('pointerdown', this.unlockHomeAudio);
-    window.removeEventListener('keydown', this.unlockHomeAudio);
-  };
 
   render(): void {
     const s = this.state;
@@ -138,7 +121,7 @@ export class Game {
       path: this.path,
       shake: this.shake,
       time: this.visualTime,
-      introTime: Math.max(0, this.visualTime - this.introStartedAt),
+      introTime: this.hasEnteredMenu ? Math.max(0, this.visualTime - this.introStartedAt) : 0,
       kinetic: this.kinetic,
       intro: this.intro,
       kineticSignals: {
@@ -240,7 +223,8 @@ export class Game {
   }
 
   get introScene(): number {
-    return introTimeline(Math.max(0, this.visualTime - this.introStartedAt)).scene;
+    const time = this.hasEnteredMenu ? Math.max(0, this.visualTime - this.introStartedAt) : 0;
+    return introTimeline(time).scene;
   }
 
   loseReason(): string {
@@ -253,6 +237,23 @@ export class Game {
   }
 
   // ---- Public input API (called by the UI) ----
+
+  enterMenu(): void {
+    if (this.hasEnteredMenu || this.state.phase !== 'menu') return;
+    this.hasEnteredMenu = true;
+    this.introStartedAt = this.visualTime;
+    this.music.restartMenu();
+    this.music.unlock();
+    this.sound.ensure();
+
+    if (!this.settings.reducedMotion) {
+      const intro = introTimeline(0);
+      this.lastIntroCueId = intro.audioCueId;
+      this.music.trigger(intro.audioCue);
+    } else {
+      this.lastIntroCueId = null;
+    }
+  }
 
   begin(forceTutorial = false): void {
     this.state = createInitialState(1337);
@@ -388,6 +389,7 @@ export class Game {
   private syncMusic(dt: number): void {
     const p = this.state.phase;
     const s = this.state;
+    if (p === 'menu' && !this.hasEnteredMenu) return;
     if (p === 'menu' && !this.settings.reducedMotion) {
       const intro = introTimeline(Math.max(0, this.visualTime - this.introStartedAt));
       if (shouldTriggerIntroCue(this.lastIntroCueId, intro)) {
