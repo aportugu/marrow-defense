@@ -79,8 +79,8 @@ open "release/mac-arm64/Marrow Defense.app"
   - `ANAKINRA` — unlocks during the IEC-HS scenario. It temporarily suppresses new
     hyperinflammation and accelerates recovery; this is a gameplay abstraction, not
     dosing or treatment guidance.
-  - `G-CSF` — repeatable at hematotoxicity 30+, provides 6 seconds of brief recovery and
-    partial protection from hematotoxicity-driven fitness drain. It costs 45 funding and has
+  - `G-CSF` — repeatable at hematotoxicity 30+, immediately lowers hematotoxicity by 10,
+    then provides 6 seconds of brief recovery and partial protection from fitness drain. It costs 45 funding and has
     a 24-second cooldown. These values are gameplay abstractions, not dosing guidance.
 - **Tuning:** `src/game/Balance.ts` — every number lives there.
 

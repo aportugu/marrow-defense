@@ -125,13 +125,13 @@ export const ABILITY: Record<AbilityId, AbilityDef> = {
   dexa: { name: 'Dexamethasone', cost: 75, cooldown: 40, glyph: '\u25b3', blurb: 'Cuts neurotoxicity and suppresses new CRS for 8s, but slows attacks and costs fitness.' },
   stemcell: { name: 'Stem-Cell Boost', cost: 140, cooldown: 0, glyph: '\u25cf', blurb: 'At hematotoxicity 20+, enables 15s of hematopoietic recovery. Gameplay abstraction.', once: true },
   anakinra: { name: 'Anakinra', cost: 0, cooldown: 35, glyph: '\u2736', blurb: 'IEC-HS scenario abstraction: suppresses new hyperinflammation and accelerates recovery for 10s.' },
-  gcsf: { name: 'G-CSF', cost: 45, cooldown: 24, glyph: '\u2739', blurb: 'At hematotoxicity 30+, provides 6s of brief marrow support. Gameplay abstraction, not dosing guidance.' },
+  gcsf: { name: 'G-CSF', cost: 45, cooldown: 24, glyph: '\u2739', blurb: 'At hematotoxicity 30+, immediately lowers it by 10 and provides 6s of brief marrow support. Gameplay abstraction, not dosing guidance.' },
 };
 
 export const TOCI = { crsDrop: 40 };
 export const DEXA = { neuroDrop: 45, suppressFor: 8, crsMultiplier: 0.35, slowAtk: 0.25, slowFor: 8, fitnessHit: 6 };
 export const STEMCELL = { minHematotoxicity: 20, duration: 15, recoveryPerSec: 2.5 };
-export const GCSF = { minHematotoxicity: 30, duration: 6, recoveryPerSec: 1.5, fitnessDrainMultiplier: 0.4 };
+export const GCSF = { minHematotoxicity: 30, hematotoxicityDrop: 10, duration: 6, recoveryPerSec: 1.5, fitnessDrainMultiplier: 0.4 };
 export const IEC_HS = {
   onsetWave: 9,
   baseSeverity: 25,

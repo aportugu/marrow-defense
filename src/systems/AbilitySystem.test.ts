@@ -115,7 +115,7 @@ describe('AbilitySystem', () => {
     expect(s.meters.hematotoxicity).toBeLessThan(50);
   });
 
-  it('G-CSF is repeatable, brief, threshold-gated, and does not instantly change meters', () => {
+  it('G-CSF is repeatable, threshold-gated, and provides immediate plus timed recovery', () => {
     const s = fresh();
     s.currency = 300;
     s.meters.hematotoxicity = GCSF.minHematotoxicity - 1;
@@ -125,12 +125,12 @@ describe('AbilitySystem', () => {
     const before = s.meters.hematotoxicity;
     activate(s, 'gcsf');
     expect(s.currency).toBe(300 - ABILITY.gcsf.cost);
-    expect(s.meters.hematotoxicity).toBe(before);
+    expect(s.meters.hematotoxicity).toBe(before - GCSF.hematotoxicityDrop);
     expect(s.gcsfUntil).toBe(s.stats.time + GCSF.duration);
     expect(s.abilities.gcsf.cooldown).toBe(ABILITY.gcsf.cooldown);
     expect(s.stats.gcsfUses).toBe(1);
     for (let i = 0; i < GCSF.duration * 20; i++) stepMeters(s, 0.05);
-    expect(s.meters.hematotoxicity).toBeLessThan(before);
+    expect(s.meters.hematotoxicity).toBeLessThan(before - GCSF.hematotoxicityDrop);
     expect(s.hematotoxicityLoad).toBeGreaterThan(0);
     expect(canActivate(s, 'gcsf')).toBe(false);
     stepAbilities(s, ABILITY.gcsf.cooldown);

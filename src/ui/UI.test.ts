@@ -105,7 +105,7 @@ describe('UI', () => {
     state.phase = 'menu';
     game.cb.onSync?.(state);
 
-    const enter = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Enter · Start Music');
+    const enter = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Enter');
     expect(enter).toBeTruthy();
     expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start run')).toBe(false);
     expect(document.querySelector('.entry-card')?.getAttribute('aria-describedby')).toBe('entry-cutscene-description');
@@ -118,13 +118,14 @@ describe('UI', () => {
     expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start run')).toBe(true);
   });
 
-  it('does not promise music on entry when music is disabled', () => {
+  it('keeps the entry copy neutral when music is disabled', () => {
     const { game, state } = setup();
     game.hasEnteredMenu = false;
     game.settings.music = false;
     state.phase = 'menu';
     game.cb.onSync?.(state);
-    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Enter Main Menu')).toBe(true);
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Enter')).toBe(true);
+    expect(document.body.textContent).not.toContain('Start Music');
   });
 
   it('exposes independent music and effects volume controls', () => {
@@ -198,5 +199,13 @@ describe('UI', () => {
     state.gcsfUntil = state.stats.time + 6;
     game.cb.onSync?.(state);
     expect(document.querySelector('.m-hematotoxicity')?.textContent).toContain('G-CSF SUPPORT');
+    expect(document.querySelector('.a-gcsf .a-state')?.textContent).toBe('support 6s');
+  });
+
+  it('shows the G-CSF hematotoxicity requirement while unavailable', () => {
+    const { game, state } = setup();
+    state.meters.hematotoxicity = 20;
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.a-gcsf .a-state')?.textContent).toBe('HEM 30+');
   });
 });

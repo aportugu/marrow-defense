@@ -50,6 +50,14 @@ export function activate(s: GameState, id: AbilityId): void {
     s.stemCellRecoveryUntil = s.stats.time + STEMCELL.duration;
     s.stats.stemcellUses++;
   } else if (id === 'gcsf') {
+    s.stats.peakHematotoxicity = Math.max(s.stats.peakHematotoxicity, s.meters.hematotoxicity);
+    if (s.waveBaseline) {
+      s.waveBaseline.peakHematotoxicity = Math.max(
+        s.waveBaseline.peakHematotoxicity,
+        s.meters.hematotoxicity,
+      );
+    }
+    s.meters.hematotoxicity = clamp(s.meters.hematotoxicity - GCSF.hematotoxicityDrop, 0, 100);
     s.gcsfUntil = s.stats.time + GCSF.duration;
     st.cooldown = a.cooldown;
     s.stats.gcsfUses++;

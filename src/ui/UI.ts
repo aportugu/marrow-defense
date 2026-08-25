@@ -10,7 +10,7 @@ import type {
   Tower,
 } from '../game/types';
 import { CANVAS_W, CANVAS_H } from '../game/types';
-import { UNIT, ABILITY, ENEMY, METER } from '../game/Balance';
+import { UNIT, ABILITY, ENEMY, GCSF, METER } from '../game/Balance';
 import { WAVES, wavePreview } from '../data/waves';
 import { computeScore } from '../systems/ScoringSystem';
 import { canActivate } from '../systems/AbilitySystem';
@@ -23,8 +23,8 @@ const METER_META: { id: 'burden' | 'crs' | 'neuro' | 'fitness' | 'hematotoxicity
   { id: 'burden', label: 'Burden' },
   { id: 'crs', label: 'CRS' },
   { id: 'neuro', label: 'Neurotoxicity' },
-  { id: 'fitness', label: 'Fitness' },
   { id: 'hematotoxicity', label: 'Hematotoxicity' },
+  { id: 'fitness', label: 'Fitness' },
 ];
 
 const GAUGE_C = 2 * Math.PI * 16;
@@ -167,6 +167,7 @@ export class UI {
       const def = ABILITY[id];
       const a = this.abilityEls[id];
       a.btn.className = `ability a-${id}`;
+      a.state.className = 'a-state';
       a.btn.title = def.blurb;
       a.btn.setAttribute('aria-label', `${def.name}: ${def.blurb}`);
       const shortcut = String(ABILITY_IDS.indexOf(id) + 1);
@@ -396,6 +397,7 @@ export class UI {
       const can = canActivate(s, id);
       a.btn.disabled = !can;
       a.btn.classList.toggle('ready', can);
+      const gcsfRemaining = Math.max(0, s.gcsfUntil - s.stats.time);
       const concerning = (id === 'toci' && s.meters.crs >= METER.crsWarn) ||
         (id === 'dexa' && (s.meters.neuro >= METER.neuroWarn || s.meters.hyperinflammation >= 55)) ||
         (id === 'stemcell' && s.meters.hematotoxicity >= METER.hematotoxicityWarn) ||
@@ -405,6 +407,10 @@ export class UI {
       a.state.textContent =
         id === 'anakinra' && !s.iecHsUnlocked
           ? 'locked'
+          : id === 'gcsf' && gcsfRemaining > 0
+            ? `support ${Math.ceil(gcsfRemaining)}s`
+          : id === 'gcsf' && s.meters.hematotoxicity < GCSF.minHematotoxicity
+            ? `HEM ${GCSF.minHematotoxicity}+`
           : def.once && st.used
           ? 'used'
           : st.cooldown > 0
@@ -534,12 +540,7 @@ export class UI {
         el('p', 'tag', 'A CAR-T tower defense'),
         description,
       );
-      addBtn(g.settings.music ? 'Enter · Start Music' : 'Enter Main Menu', 'enter');
-      card.append(el(
-        'p',
-        'keys',
-        g.settings.music ? 'Begin the cinematic experience' : 'Music is currently disabled in Settings',
-      ));
+      addBtn('Enter', 'enter');
     } else if (kind === 'start') {
       card.classList.add('start-card');
       const description = el(
