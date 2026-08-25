@@ -57,6 +57,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 export class UI {
   private game: Game;
+  private screen: HTMLDivElement;
   private canvas: HTMLCanvasElement;
   private stage: HTMLDivElement;
   private banner: HTMLDivElement;
@@ -101,7 +102,7 @@ export class UI {
     game.cb.onSync = (s) => this.sync(s);
     game.cb.onNotice = (message) => this.showNotice(message);
 
-    const screen = el('div', 'screen');
+    this.screen = el('div', 'screen');
 
     const hud = el('div', 'hud');
     const left = el('div', 'hud-left');
@@ -210,8 +211,8 @@ export class UI {
     this.rotateOverlay.setAttribute('role', 'status');
     this.rotateOverlay.setAttribute('aria-live', 'polite');
     this.rotateOverlay.setAttribute('aria-hidden', 'true');
-    screen.append(hud, this.stage, units, abilities, this.menu, this.popup, this.rotateOverlay);
-    app.appendChild(screen);
+    this.screen.append(hud, this.stage, units, abilities, this.menu, this.popup, this.rotateOverlay);
+    app.appendChild(this.screen);
 
     this.wireCanvas();
     this.wireKeys();
@@ -730,6 +731,7 @@ export class UI {
     else if (s.phase === 'lost') kind = 'lose';
 
     if (!kind) {
+      this.screen.classList.remove('opening-menu');
       this.menu.classList.add('hidden');
       this.menu.classList.remove('menu-start');
       this.canvas.removeAttribute('aria-hidden');
@@ -737,6 +739,7 @@ export class UI {
       return;
     }
     const isOpening = kind === 'entry' || kind === 'start';
+    this.screen.classList.toggle('opening-menu', isOpening);
     this.menu.classList.toggle('menu-start', isOpening);
     this.menu.classList.toggle('menu-entry', kind === 'entry');
     if (isOpening) this.menu.dataset.introScene = String(this.game.introScene);

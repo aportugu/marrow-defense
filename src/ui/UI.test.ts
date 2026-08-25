@@ -159,7 +159,18 @@ describe('UI', () => {
     expect(document.querySelector('.start-card')?.getAttribute('aria-describedby')).toBe('intro-cutscene-description');
     expect(document.querySelector('#intro-cutscene-description')?.textContent).toContain('leukapheresis');
     expect(game.canvas.getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('.screen')?.classList.contains('opening-menu')).toBe(true);
     expect(document.activeElement?.textContent).toBe('Start run');
+  });
+
+  it('restores the gameplay layout after leaving the opening menu', () => {
+    const { game, state } = setup();
+    state.phase = 'menu';
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.screen')?.classList.contains('opening-menu')).toBe(true);
+    state.phase = 'playing';
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.screen')?.classList.contains('opening-menu')).toBe(false);
   });
 
   it('requires an accessible entry click before revealing the main menu', () => {
