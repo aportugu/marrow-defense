@@ -40,7 +40,7 @@ describe('stepMeters', () => {
     const a = fresh();
     a.meters.neuro = 50;
     stepMeters(a, 1); // planning
-    expect(a.meters.neuro).toBeCloseTo(48.5);
+    expect(a.meters.neuro).toBeCloseTo(48.8);
 
     const b = fresh();
     b.subPhase = 'wave';

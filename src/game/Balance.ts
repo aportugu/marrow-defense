@@ -176,7 +176,7 @@ export const METER = {
   hematotoxicityFitnessDrainMax: 0.5,
   crsWarn: 60,
   neuroDrip: 0.35,
-  neuroDecay: 1.5,
+  neuroDecay: 1.2,
   neuroWarn: 60,
 };
 
