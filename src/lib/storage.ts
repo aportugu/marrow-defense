@@ -27,7 +27,7 @@ export function loadSettings(): Settings {
     music: true,
     musicVolume: 0.6,
     sfxVolume: 0.6,
-    speed: 1,
+    speed: 3,
     reducedMotion: prefersReduced,
     tutorialSeen: false,
   };

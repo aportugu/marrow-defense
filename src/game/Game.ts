@@ -80,8 +80,9 @@ export class Game {
     this.settings = loadSettings();
     this.sound.applySettings(this.settings);
     this.music.applySettings(this.settings);
-    const isElectron = typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent);
-    if (isElectron) this.music.unlock();
+    // Start immediately where autoplay is permitted. Browsers that suspend
+    // WebAudio are resumed by the first pointer or keyboard interaction below.
+    this.music.unlock();
     this.highScore = loadHighScore();
     document.documentElement.classList.toggle('reduce-motion', this.settings.reducedMotion);
 

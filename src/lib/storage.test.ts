@@ -14,6 +14,12 @@ class MemoryStorage {
 describe('audio settings persistence', () => {
   afterEach(() => Reflect.deleteProperty(globalThis, 'localStorage'));
 
+  it('defaults new players to 3x speed', () => {
+    const storage = new MemoryStorage();
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+    expect(loadSettings().speed).toBe(3);
+  });
+
   it('migrates the legacy shared volume into independent controls', () => {
     const storage = new MemoryStorage();
     storage.setItem('marrow-defense:settings', JSON.stringify({ volume: 0.35, music: false }));
