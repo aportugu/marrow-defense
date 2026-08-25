@@ -30,7 +30,7 @@ const METER_META: { id: 'burden' | 'crs' | 'neuro' | 'fitness' | 'hematotoxicity
 const GAUGE_C = 2 * Math.PI * 16;
 
 const UNIT_IDS: UnitTypeId[] = ['bcma', 'dual', 'memory'];
-const ABILITY_IDS: AbilityId[] = ['toci', 'dexa', 'stemcell', 'anakinra', 'gcsf'];
+const ABILITY_IDS: AbilityId[] = ['toci', 'dexa', 'anakinra', 'gcsf', 'stemcell'];
 
 const SCORE_LABELS: Record<string, string> = {
   hematotoxicity: 'Hematotoxicity control',
@@ -332,9 +332,9 @@ export class UI {
         if (st.phase === 'playing' || st.phase === 'paused') g.togglePause();
       } else if (e.key === '1') g.useAbility('toci');
       else if (e.key === '2') g.useAbility('dexa');
-      else if (e.key === '3') g.useAbility('stemcell');
-      else if (e.key === '4') g.useAbility('anakinra');
-      else if (e.key === '5') g.useAbility('gcsf');
+      else if (e.key === '3') g.useAbility('anakinra');
+      else if (e.key === '4') g.useAbility('gcsf');
+      else if (e.key === '5') g.useAbility('stemcell');
       else if (e.key === 'q' || e.key === 'Q') g.setBuildType('bcma');
       else if (e.key === 'w' || e.key === 'W') g.setBuildType('dual');
       else if (e.key === 'e' || e.key === 'E') g.setBuildType('memory');

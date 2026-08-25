@@ -45,12 +45,21 @@ describe('UI', () => {
   it('renders five accessible abilities and handles build/ability shortcuts', () => {
     const { game } = setup();
     expect(document.querySelectorAll('.ability')).toHaveLength(5);
+    expect([...document.querySelectorAll('.ability .a-name')].map((node) => node.textContent)).toEqual([
+      '1 · Tocilizumab',
+      '2 · Dexamethasone',
+      '3 · Anakinra',
+      '4 · G-CSF',
+      '5 · Stem-Cell Boost',
+    ]);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'q' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '3' }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '4' }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '5' }));
     expect(game.setBuildType).toHaveBeenCalledWith('bcma');
     expect(game.useAbility).toHaveBeenCalledWith('anakinra');
     expect(game.useAbility).toHaveBeenCalledWith('gcsf');
+    expect(game.useAbility).toHaveBeenCalledWith('stemcell');
   });
 
   it('refreshes computed tower statistics after an upgrade', () => {
