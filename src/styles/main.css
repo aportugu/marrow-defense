@@ -685,6 +685,9 @@ input:focus-visible {
   body { overflow: hidden; }
 
   #app {
+    position: fixed;
+    inset: 0;
+    width: 100%;
     height: 100dvh;
     min-height: 100dvh;
     align-items: stretch;
@@ -842,6 +845,9 @@ input:focus-visible {
   .opening-menu > .stage {
     position: absolute;
     inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     height: 100%;
     max-height: none;
@@ -853,11 +859,13 @@ input:focus-visible {
   .opening-menu > .stage canvas {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    object-position: center center;
   }
 
   .opening-menu .menu.menu-start:not(.menu-entry) {
     justify-content: flex-start;
+    align-items: center;
     padding: 10px clamp(12px, 3vw, 24px);
     background: linear-gradient(90deg, rgba(8, 2, 6, 0.92) 0%, rgba(8, 2, 6, 0.72) 43%, rgba(8, 2, 6, 0.08) 78%);
     backdrop-filter: none;
