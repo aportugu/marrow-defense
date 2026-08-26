@@ -7,7 +7,7 @@ import { UI } from './UI';
 
 function setup() {
   document.body.innerHTML = '<main id="app"></main>';
-  const state = createInitialState(4);
+  const state = createInitialState('marrow', 4);
   startGame(state, false);
   const game = {
     canvas: document.createElement('canvas'),
@@ -16,6 +16,7 @@ function setup() {
     hasEnteredMenu: true,
     settings: { sound: true, music: true, musicVolume: 0.6, sfxVolume: 0.6, speed: 1, reducedMotion: false, tutorialSeen: true },
     highScore: 0,
+    progress: { cleared: { marrow: false, liver: false }, best: { marrow: null, liver: null } },
     buildType: null,
     selectedTower: null,
     setBuildType: vi.fn(),
@@ -32,6 +33,7 @@ function setup() {
     enterMenu: vi.fn(),
     toMenu: vi.fn(),
     setSettings: vi.fn(),
+    previewLevel: vi.fn(),
     loseReason: vi.fn(() => 'lost'),
   } as unknown as Game;
   new UI(game, document.getElementById('app')!);
@@ -160,7 +162,11 @@ describe('UI', () => {
     expect(document.querySelector('#intro-cutscene-description')?.textContent).toContain('leukapheresis');
     expect(game.canvas.getAttribute('aria-hidden')).toBe('true');
     expect(document.querySelector('.screen')?.classList.contains('opening-menu')).toBe(true);
-    expect(document.activeElement?.textContent).toBe('Start run');
+    expect(document.activeElement?.classList.contains('level-card')).toBe(true);
+    expect([...document.querySelectorAll('.level-card')].map((n) => n.classList.contains('selected'))).toEqual([true, false]);
+    expect([...document.querySelectorAll('.level-card')].map((n) => n.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+    expect(document.querySelector('.menu-kicker')?.textContent).toBe('CHOOSE YOUR BATTLEFIELD');
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start Marrow')).toBe(true);
   });
 
   it('restores the gameplay layout after leaving the opening menu', () => {
@@ -181,7 +187,7 @@ describe('UI', () => {
 
     const enter = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Enter');
     expect(enter).toBeTruthy();
-    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start run')).toBe(false);
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start Marrow')).toBe(false);
     expect(document.querySelector('.entry-card')?.getAttribute('aria-describedby')).toBe('entry-cutscene-description');
 
     enter?.click();
@@ -189,7 +195,65 @@ describe('UI', () => {
 
     game.hasEnteredMenu = true;
     game.cb.onSync?.(state);
-    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start run')).toBe(true);
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start Marrow')).toBe(true);
+  });
+
+  it('selects a level from the start menu and starts that level', () => {
+    const { game, state } = setup();
+    game.progress.cleared.marrow = true;
+    game.progress.best.liver = { score: 684, response: 'VGPR' };
+    state.phase = 'menu';
+    game.cb.onSync?.(state);
+    const marrowCard = [...document.querySelectorAll<HTMLButtonElement>('.level-card')].find((n) => n.textContent?.startsWith('Marrow'))!;
+    marrowCard.click();
+    game.cb.onSync?.(state);
+    const liverCard = [...document.querySelectorAll<HTMLButtonElement>('.level-card')].find((n) => n.textContent?.startsWith('Hepatic'))!;
+    expect(liverCard.disabled).toBe(false);
+    expect(liverCard.textContent).toContain('Best: VGPR · 684 pts');
+    liverCard.click();
+    game.cb.onSync?.(state);
+    const start = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Start Hepatic — Advanced');
+    expect(start).toBeTruthy();
+    start?.click();
+    expect(game.begin).toHaveBeenCalledWith('liver');
+  });
+
+  it('offers hepatic immediately and clearly marks it as advanced', () => {
+    const { game, state } = setup();
+    game.progress.cleared.marrow = false;
+    state.phase = 'menu';
+    game.cb.onSync?.(state);
+    const liverCard = [...document.querySelectorAll<HTMLButtonElement>('.level-card')].find((n) => n.textContent?.startsWith('Hepatic'))!;
+    expect(liverCard.disabled).toBe(false);
+    expect(liverCard.textContent).toContain('ADVANCED');
+    expect(liverCard.textContent).toContain('3 CONVERGING LANES');
+    expect(liverCard.textContent).toContain('Recommended after Marrow');
+    liverCard.click();
+    expect(game.previewLevel).toHaveBeenCalledWith('liver');
+  });
+
+  it('briefs the hepatic lane identities and updates the battlefield description', () => {
+    const { game, state } = setup();
+    state.level = 'liver';
+    state.phase = 'playing';
+    state.subPhase = 'planning';
+    state.wave = 1;
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.hepatic-briefing')?.textContent).toContain('PORTAL VEIN');
+    expect(document.querySelector('.hepatic-briefing')?.textContent).toContain('BILIARY BRANCH');
+    expect(game.canvas.getAttribute('aria-label')).toContain('hepatic plasmacytoma');
+  });
+
+  it('shows a timed anatomical warning for an active hepatic surge', () => {
+    const { game, state } = setup();
+    state.level = 'liver';
+    state.subPhase = 'wave';
+    state.activeHepaticEvent = { id: 401, kind: 'surge', lane: 1, stage: 'warning', remaining: 2.4 };
+    game.cb.onSync?.(state);
+    const warning = document.querySelector('.hepatic-event');
+    expect(warning?.textContent).toContain('PLASMA-CELL SURGE — HEPATIC ARTERY');
+    expect(warning?.textContent).toContain('IMPACT IN 3s');
+    expect(warning?.textContent).not.toMatch(/VOLUME|SPEED|RESISTANCE/);
   });
 
   it('keeps the entry copy neutral when music is disabled', () => {
@@ -227,7 +291,37 @@ describe('UI', () => {
     expect(document.querySelector('.education-disclaimer')?.textContent).toContain('Simplified simulation');
     expect(document.querySelectorAll('.references a').length).toBeGreaterThan(0);
     expect(document.querySelector('details summary')?.textContent).toBe('BCMA');
+    expect(document.body.textContent).toContain('IMWG response categories');
     expect(document.querySelector('.tutorial')).toBeNull();
+  });
+
+  it('shows the simulated response, full name, score, and disclaimer after a win', () => {
+    const { game, state } = setup();
+    state.phase = 'won';
+    state.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
+    state.stats.peakCrs = 0;
+    state.stats.peakNeuro = 0;
+    state.stats.peakHematotoxicity = 0;
+    state.stats.lowestFitness = 100;
+    state.stats.kills = 999;
+    state.stats.time = 100;
+    state.currency = 400;
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.response-badge')?.textContent).toBe('sCR');
+    expect(document.querySelector('.response-name')?.textContent).toBe('Stringent complete response');
+    expect(document.querySelector('.score-big')?.textContent).toContain('pts');
+    expect(document.querySelector('.response-disclaimer')?.textContent).toContain('not an actual clinical IMWG assessment');
+    expect(document.querySelector('.grade')).toBeNull();
+  });
+
+  it('shows PD on the defeat screen when the hepatic core escapes', () => {
+    const { game, state } = setup();
+    state.level = 'liver';
+    state.phase = 'lost';
+    state.bossEscaped = true;
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.response-badge')?.textContent).toBe('PD');
+    expect(document.querySelector('.response-name')?.textContent).toBe('Progressive disease');
   });
 
   it('shows the IEC-HS trend panel without invented lab values', () => {

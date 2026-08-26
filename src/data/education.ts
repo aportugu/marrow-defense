@@ -11,15 +11,27 @@ export interface GlossaryEntry {
   references: string[];
 }
 
-export const WAVE_TITLES: Readonly<Partial<Record<number, string>>> = Object.freeze({
-  1: 'Target Engagement',
-  3: 'High Disease Burden',
-  4: 'Antigen Escape',
-  6: 'Toxicity Divergence',
-  8: 'Persistence',
-  9: 'Hyperinflammatory Shift',
-  10: 'Integrated Response',
-});
+import type { LevelId } from '../game/types';
+
+export const WAVE_TITLES: Record<LevelId, Readonly<Partial<Record<number, string>>>> = {
+  marrow: {
+    1: 'Target Engagement',
+    3: 'High Disease Burden',
+    4: 'Antigen Escape',
+    6: 'Toxicity Divergence',
+    8: 'Persistence',
+    9: 'Hyperinflammatory Shift',
+    10: 'Integrated Response',
+  },
+  liver: {
+    1: 'Vascular Entry',
+    3: 'Multifocal Disease',
+    5: 'Sinusoidal Spread',
+    7: 'Biliary Obstruction',
+    9: 'Extramedullary Persistence',
+    10: 'Hepatic Clearance',
+  },
+} as const;
 
 export const REFERENCES: EducationReference[] = [
   { id: 'astct', citation: 'Lee DW et al. ASTCT consensus grading for CRS and neurologic toxicity (2019).', url: 'https://doi.org/10.1016/j.bbmt.2018.12.758' },
@@ -28,6 +40,7 @@ export const REFERENCES: EducationReference[] = [
   { id: 'idecel', citation: 'Munshi NC et al. Idecabtagene vicleucel in multiple myeloma (2021).', url: 'https://doi.org/10.1056/NEJMoa2024850' },
   { id: 'iech', citation: 'Hines MR et al. ASTCT IEC-HS consensus framework (2023).', url: 'https://doi.org/10.1016/j.jtct.2023.03.019' },
   { id: 'icaht', citation: 'Rejeski K et al. EHA/EBMT ICAHT consensus grading and best-practice recommendations (2023).', url: 'https://doi.org/10.1182/blood.2023020578' },
+  { id: 'imwg-response', citation: 'Kumar S et al. IMWG consensus criteria for response and minimal residual disease assessment in multiple myeloma (2016).', url: 'https://doi.org/10.1016/S1470-2045(16)30206-6' },
 ];
 
 export const GLOSSARY: GlossaryEntry[] = [
@@ -39,5 +52,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { id: 'icaht', term: 'Hematotoxicity / ICAHT', summary: 'Immune effector cell-associated hematotoxicity describes cytopenic toxicity after cellular therapy. The delayed game meter is not a blood count, risk score, or clinical grade.', references: ['icaht', 'toxicity'] },
   { id: 'gcsf', term: 'G-CSF support', summary: 'G-CSF is represented as brief, repeatable marrow support. Its threshold, timing, recovery rate, and fitness protection are gameplay abstractions—not dosing or patient-specific guidance.', references: ['icaht', 'toxicity'] },
   { id: 'iech', term: 'IEC-HS', summary: 'IEC-HS is a distinct hyperinflammatory syndrome that may emerge as CRS is resolving. The independent meter is not a diagnostic score, and ability timings are not dosing guidance.', references: ['iech', 'astct'] },
+  { id: 'extramedullary', term: 'Extramedullary plasmacytoma', summary: 'Plasma-cell tumors outside the bone marrow can arise in organs such as the liver, where disease spreads along vascular and biliary routes. The hepatic level maps that spread onto three converging lanes.', references: ['bcma', 'astct'] },
+  { id: 'imwg-response', term: 'IMWG response categories', summary: 'sCR, CR, VGPR, PR, SD, and PD describe progressively different responses to myeloma therapy. Real assessment uses laboratory, imaging, marrow, and progression criteria that this gameplay score does not model.', references: ['imwg-response'] },
   { id: 'limits', term: 'Simulation limitations', summary: 'All biology, toxicity, timing, and treatment effects are simplified for play. This game provides no diagnostic, dosing, or patient-specific medical guidance.', references: ['astct', 'toxicity'] },
 ];

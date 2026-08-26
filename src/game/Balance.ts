@@ -1,6 +1,6 @@
 // Central game balance. Every tunable number lives in this single file so the
 // game can be re-tuned in one place. See PLAN.md.
-import type { EnemyTypeId, UnitTypeId, AbilityId } from './types';
+import type { EnemyTypeId, UnitTypeId, AbilityId, ResponseCategory } from './types';
 
 export const START = {
   currency: 120,
@@ -53,6 +53,12 @@ export const ENEMY: Record<EnemyTypeId, EnemyDef> = {
     neuroOnKill: 0.6,
     escapeBurden: 9, escapeHematotoxicity: 4,
     color: '#9a9ac0', icon: 'dim', label: 'BCMA-low clone',
+  },
+  hepaticCore: {
+    hp: 1200, speed: 6, size: 31, reward: 160, crsOnKill: 18,
+    neuroOnKill: 2,
+    escapeBurden: 35, escapeHematotoxicity: 14,
+    color: '#c026d3', icon: 'mass', label: 'Hepatic plasmacytoma core',
   },
 };
 
@@ -203,10 +209,12 @@ export const SCORING = {
   },
   caps: { kills: 287, currency: 400 },
   timeTarget: 720,
-  grades: [
-    [850, 'S'],
-    [750, 'A'],
-    [625, 'B'],
-    [450, 'C'],
-  ] as [number, string][],
+  responses: [
+    [850, 'sCR'],
+    [750, 'CR'],
+    [625, 'VGPR'],
+    [450, 'PR'],
+    [250, 'SD'],
+    [0, 'PD'],
+  ] as [number, ResponseCategory][],
 };

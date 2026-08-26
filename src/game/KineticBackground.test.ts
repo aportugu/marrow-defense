@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KineticBackground, createKineticDescriptors, healthyMoteFraction } from './KineticBackground';
+import { KineticBackground, createKineticDescriptors, healthyMoteFraction, hepaticTumorIntensity } from './KineticBackground';
 
 describe('kinetic background data', () => {
   it('creates deterministic descriptors and caps the particle budget', () => {
@@ -24,5 +24,12 @@ describe('kinetic background data', () => {
     expect(healthyMoteFraction(100)).toBe(0.35);
     expect(healthyMoteFraction(70, true)).toBeGreaterThan(healthyMoteFraction(70));
     expect(healthyMoteFraction(0, true)).toBe(1);
+  });
+
+  it('intensifies and then clears the hepatic tumor field deterministically', () => {
+    const early = hepaticTumorIntensity(0, 0, 0);
+    const late = hepaticTumorIntensity(1, 70, 1);
+    expect(late).toBeGreaterThan(early);
+    expect(hepaticTumorIntensity(1, 100, 1, true)).toBeLessThan(early);
   });
 });

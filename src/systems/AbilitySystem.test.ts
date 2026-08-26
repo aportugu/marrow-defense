@@ -5,7 +5,7 @@ import { stepMeters } from './MeterSystem';
 import { activate, canActivate, stepAbilities } from './AbilitySystem';
 
 function fresh() {
-  const s = createInitialState(1);
+  const s = createInitialState('marrow', 1);
   startGame(s);
   return s;
 }

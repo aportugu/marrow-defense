@@ -6,23 +6,38 @@ export type Vec = { x: number; y: number };
 export const CANVAS_W = 1280;
 export const CANVAS_H = 720;
 
-export type EnemyTypeId = 'standard' | 'proliferative' | 'highBurden' | 'bcmaLow';
+export type EnemyTypeId = 'standard' | 'proliferative' | 'highBurden' | 'bcmaLow' | 'hepaticCore';
 export type UnitTypeId = 'bcma' | 'dual' | 'memory';
 export type AbilityId = 'toci' | 'dexa' | 'stemcell' | 'anakinra' | 'gcsf';
 export type HintId = 'chooseUnit' | 'placeUnit' | 'startWave';
 
 export type GamePhase = 'menu' | 'playing' | 'paused' | 'won' | 'lost';
 export type SubPhase = 'planning' | 'wave';
+export type LevelId = 'marrow' | 'liver';
+export type ResponseCategory = 'sCR' | 'CR' | 'VGPR' | 'PR' | 'SD' | 'PD';
+export type EnemyBehavior = 'mitotic' | 'obstruction' | 'bossEscort' | 'surge';
+export type HepaticEventKind = 'surge' | 'bossPhase';
+export type HepaticCueKind = 'flareWarn' | 'flareImpact' | 'division' | 'obstruction' | 'shieldBreak' | 'bossPhase2' | 'bossPhase3';
 
 export interface Enemy {
   id: number;
   type: EnemyTypeId;
+  lane: number;
   x: number;
   y: number;
   pathPos: number;
   hp: number;
   maxHp: number;
+  speed: number;
+  reward: number;
   alive: boolean;
+  behavior?: EnemyBehavior;
+  splitDone?: boolean;
+  obstructionTimer?: number;
+  escortsSpawned?: number;
+  parentBossId?: number;
+  bossPhase?: 1 | 2 | 3;
+  baseSpeed?: number;
 }
 
 export interface Tower {
@@ -59,7 +74,7 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
-  effect?: 'cytokine' | 'neuro' | 'resist' | 'dual';
+  effect?: 'cytokine' | 'neuro' | 'resist' | 'dual' | 'division' | 'obstruction' | 'boss';
 }
 
 export interface Meters {
@@ -149,12 +164,40 @@ export interface ComputedTowerStats {
 
 export interface SpawnEntry {
   type: EnemyTypeId;
+  lane: number;
   at: number;
+  behavior?: EnemyBehavior;
+}
+
+export interface HepaticEventEntry {
+  id: number;
+  kind: HepaticEventKind;
+  lane: number;
+  at: number;
+  count: number;
+  enemyType: EnemyTypeId;
+  warned: boolean;
+  fired: boolean;
+}
+
+export interface ActiveHepaticEvent {
+  id: number;
+  kind: HepaticEventKind;
+  lane: number;
+  stage: 'warning' | 'impact';
+  remaining: number;
+}
+
+export interface HepaticCue {
+  serial: number;
+  kind: HepaticCueKind;
+  lane: number;
 }
 
 export interface GameState {
   phase: GamePhase;
   subPhase: SubPhase;
+  level: LevelId;
   wave: number;
   wavesTotal: number;
   countdown: number;
@@ -183,4 +226,9 @@ export interface GameState {
   anakinraUntil: number;
   iecHsDexaUntil: number;
   hyperinflammationTrend: number;
+  bossEscaped: boolean;
+  hepaticEventQueue: HepaticEventEntry[];
+  activeHepaticEvent: ActiveHepaticEvent | null;
+  hepaticCue: HepaticCue | null;
+  hepaticCueSerial: number;
 }

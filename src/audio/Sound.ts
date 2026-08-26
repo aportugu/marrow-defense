@@ -1,7 +1,7 @@
 // Tiny WebAudio synth. Every sound is generated (no assets), all guarded so it
 // is a no-op until the user interacts and the context is allowed.
 import type { Settings } from '../lib/storage';
-import type { AbilityId } from '../game/types';
+import type { AbilityId, HepaticCueKind } from '../game/types';
 
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -81,6 +81,20 @@ export class Sound {
   clear(): void {
     this.blip(620, 0.18, 'triangle', 0.24);
     this.blip(820, 0.2, 'triangle', 0.2, 0.1);
+  }
+
+  hepatic(kind: HepaticCueKind): void {
+    const cues: Record<HepaticCueKind, Array<[number, number, OscillatorType, number]>> = {
+      flareWarn: [[92, .34, 'sawtooth', .2], [138, .25, 'triangle', .14]],
+      flareImpact: [[48, .5, 'sine', .42], [96, .22, 'sawtooth', .2]],
+      division: [[420, .12, 'triangle', .18], [630, .18, 'sine', .14]],
+      obstruction: [[72, .45, 'square', .16], [61, .55, 'sawtooth', .12]],
+      shieldBreak: [[260, .18, 'triangle', .2], [520, .3, 'sine', .2]],
+      bossPhase2: [[82, .5, 'sawtooth', .24], [123, .4, 'triangle', .2]],
+      bossPhase3: [[46, .65, 'sawtooth', .3], [92, .5, 'square', .22]],
+    };
+    cues[kind].forEach(([frequency, duration, wave, gain], index) =>
+      this.blip(frequency, duration, wave, gain, index * .07));
   }
 
   win(): void {

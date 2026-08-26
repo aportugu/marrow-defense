@@ -11,6 +11,12 @@ cellular persistence, and a wave-9 IEC-HS situation directly through enemy behav
 combat feedback, meters, and audiovisual changes. A compact cited Clinical Glossary is
 available from the menu and pause screen without interrupting play.
 
+Two levels are available immediately: the single-lane Marrow campaign and the advanced
+Hepatic campaign, which defends a liver plasmacytoma across portal, arterial, and biliary
+routes before a dedicated wave-10 core encounter. Each level has its own generated score;
+Hepatic uses a continuous 80-bar F#-minor synthwave score with a recurring heroic lead,
+driving analog bass, wave-reactive orchestration, and event-responsive mix accents.
+
 TypeScript + Vite + Canvas. No backend, no auth, no external assets.
 
 ## Play online

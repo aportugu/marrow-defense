@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildPath, canPlaceAt, distToPath, placementFailure, posAt } from './path';
+import { buildPaths, canPlaceAt, distToLanePaths, distToPath, placementFailure, posAt } from './path';
 
 describe('path', () => {
-  const p = buildPath();
+  const [p] = buildPaths('marrow');
+  const marrow = [p];
 
   it('builds a long path with cumulative distances', () => {
     expect(p.points.length).toBeGreaterThan(50);
@@ -29,19 +30,19 @@ describe('path', () => {
   });
 
   it('canPlaceAt enforces margins and path clearance', () => {
-    expect(canPlaceAt(p, [], 20, 20)).toBe(false);
-    expect(canPlaceAt(p, [], 1280, 720)).toBe(false);
+    expect(canPlaceAt(marrow, [], 20, 20)).toBe(false);
+    expect(canPlaceAt(marrow, [], 1280, 720)).toBe(false);
     const onPath = posAt(p, 50);
-    expect(canPlaceAt(p, [], onPath.x, onPath.y)).toBe(false);
+    expect(canPlaceAt(marrow, [], onPath.x, onPath.y)).toBe(false);
     const off = posAt(p, 50);
     let fx = off.x;
     let fy = off.y;
     for (let d = 60; d < 400; d += 2) {
       fx = off.x + d;
       fy = off.y;
-      if (distToPath(p, fx, fy) > 48) break;
+      if (distToLanePaths(marrow, fx, fy) > 48) break;
     }
-    expect(canPlaceAt(p, [], fx, fy)).toBe(true);
+    expect(canPlaceAt(marrow, [], fx, fy)).toBe(true);
   });
 
   it('canPlaceAt enforces spacing between units', () => {
@@ -49,9 +50,9 @@ describe('path', () => {
     let x = anchor.x;
     for (let d = 60; d < 400; d += 2) {
       x = anchor.x + d;
-      if (distToPath(p, x, anchor.y) > 48) break;
+      if (distToLanePaths(marrow, x, anchor.y) > 48) break;
     }
-    if (!canPlaceAt(p, [], x, anchor.y)) return;
+    if (!canPlaceAt(marrow, [], x, anchor.y)) return;
     const tower = {
       id: 1,
       type: 'bcma' as const,
@@ -64,13 +65,32 @@ describe('path', () => {
       wavesSurvived: 0,
       buffPower: 0,
     };
-    expect(canPlaceAt(p, [tower], x + 20, anchor.y)).toBe(false);
-    expect(canPlaceAt(p, [tower], x + 40, anchor.y)).toBe(true);
+    expect(canPlaceAt(marrow, [tower], x + 20, anchor.y)).toBe(false);
+    expect(canPlaceAt(marrow, [tower], x + 40, anchor.y)).toBe(true);
   });
 
   it('reports why placement is invalid', () => {
-    expect(placementFailure(p, [], 10, 10)).toBe('bounds');
+    expect(placementFailure(marrow, [], 10, 10)).toBe('bounds');
     const onPath = posAt(p, 200);
-    expect(placementFailure(p, [], onPath.x, onPath.y)).toBe('path');
+    expect(placementFailure(marrow, [], onPath.x, onPath.y)).toBe('path');
+  });
+
+  it('builds three converging lanes for the liver level', () => {
+    const liver = buildPaths('liver');
+    expect(liver.length).toBe(3);
+    for (const lane of liver) {
+      expect(lane.length).toBeGreaterThan(900);
+      const end = posAt(lane, lane.length);
+      expect(end.x).toBeGreaterThan(1200);
+      expect(Math.abs(end.y - 720 * 0.52)).toBeLessThan(40);
+    }
+  });
+
+  it('distToLanePaths returns the nearest lane distance', () => {
+    const liver = buildPaths('liver');
+    const [portal, artery] = liver;
+    const onArtery = posAt(artery, 200);
+    expect(distToLanePaths(liver, onArtery.x, onArtery.y)).toBeLessThan(1);
+    expect(distToLanePaths(liver, onArtery.x, onArtery.y)).toBeLessThanOrEqual(distToPath(portal, onArtery.x, onArtery.y) + 1e-6);
   });
 });

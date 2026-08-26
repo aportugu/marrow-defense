@@ -90,6 +90,7 @@ export function stepMeters(s: GameState, dt: number): void {
 
 export function checkEnd(s: GameState): 'won' | 'lost' | null {
   if (s.phase !== 'playing') return null;
+  if (s.bossEscaped) return 'lost';
   const m = s.meters;
   if (m.crs >= 100 || m.neuro >= 100 || m.hyperinflammation >= 100 || m.fitness <= 0) return 'lost';
   if (s.wave > s.wavesTotal) return 'won';

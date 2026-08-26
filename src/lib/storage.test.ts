@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadSettings, saveSettings } from './storage';
+import { defaultProgress, isBetterResult, loadProgress, loadSettings, saveProgress, saveSettings } from './storage';
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -52,5 +52,43 @@ describe('audio settings persistence', () => {
     expect(settings).not.toHaveProperty('learningCards');
     saveSettings(settings);
     expect(JSON.parse(storage.getItem('marrow-defense:settings')!)).not.toHaveProperty('learningCards');
+  });
+});
+
+describe('level response persistence', () => {
+  afterEach(() => Reflect.deleteProperty(globalThis, 'localStorage'));
+
+  it('migrates numeric level bests to response records', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('marrow-defense:progress', JSON.stringify({
+      cleared: { marrow: true, liver: false },
+      best: { marrow: 760, liver: 300 },
+    }));
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+    expect(loadProgress()).toEqual({
+      cleared: { marrow: true, liver: false },
+      best: {
+        marrow: { score: 760, response: 'CR' },
+        liver: { score: 300, response: 'SD' },
+      },
+    });
+  });
+
+  it('round-trips response records and sanitizes invalid best data', () => {
+    const storage = new MemoryStorage();
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+    const progress = defaultProgress();
+    progress.best.marrow = { score: 684, response: 'VGPR' };
+    saveProgress(progress);
+    expect(loadProgress().best.marrow).toEqual({ score: 684, response: 'VGPR' });
+
+    storage.setItem('marrow-defense:progress', JSON.stringify({ best: { marrow: 'bad', liver: { score: -2 } } }));
+    expect(loadProgress().best).toEqual({ marrow: null, liver: null });
+  });
+
+  it('ranks response before score and score within an equal response', () => {
+    expect(isBetterResult({ score: 500, response: 'PR' }, { score: 800, response: 'SD' })).toBe(true);
+    expect(isBetterResult({ score: 700, response: 'VGPR' }, { score: 680, response: 'VGPR' })).toBe(true);
+    expect(isBetterResult({ score: 650, response: 'VGPR' }, { score: 680, response: 'VGPR' })).toBe(false);
   });
 });

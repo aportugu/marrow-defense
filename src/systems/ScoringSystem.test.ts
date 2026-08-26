@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, startGame } from '../game/GameState';
 import { SCORING } from '../game/Balance';
-import { computeScore } from './ScoringSystem';
+import { computeScore, responseForScore } from './ScoringSystem';
+import { LEVELS } from '../data/levels';
 
 function fresh() {
-  const s = createInitialState(1);
+  const s = createInitialState('marrow', 1);
   startGame(s);
   return s;
 }
@@ -16,7 +17,7 @@ describe('ScoringSystem', () => {
     const a = computeScore(s);
     const b = computeScore(s);
     expect(a.score).toBe(b.score);
-    expect(a.grade).toBe(b.grade);
+    expect(a.response).toEqual(b.response);
     expect(a.parts).toEqual(b.parts);
   });
 
@@ -27,6 +28,13 @@ describe('ScoringSystem', () => {
     const r = computeScore(s);
     expect(r.parts.kills).toBe(SCORING.weights.kills);
     expect(r.parts.currency).toBe(SCORING.weights.currency);
+  });
+
+  it('uses the hepatic level kill target instead of the marrow cap', () => {
+    const s = createInitialState('liver', 1);
+    startGame(s);
+    s.stats.kills = LEVELS.liver.scoreKillTarget;
+    expect(computeScore(s).parts.kills).toBe(SCORING.weights.kills);
   });
 
   it('rewards leak-free precision instead of ability usage', () => {
@@ -46,7 +54,16 @@ describe('ScoringSystem', () => {
     );
   });
 
-  it('awards S for an excellent run', () => {
+  it('maps every score boundary to an IMWG-inspired response category', () => {
+    const cases = [
+      [1000, 'sCR'], [850, 'sCR'], [849, 'CR'], [750, 'CR'],
+      [749, 'VGPR'], [625, 'VGPR'], [624, 'PR'], [450, 'PR'],
+      [449, 'SD'], [250, 'SD'], [249, 'PD'], [0, 'PD'],
+    ] as const;
+    for (const [score, response] of cases) expect(responseForScore(score).id).toBe(response);
+  });
+
+  it('awards sCR for an excellent run', () => {
     const s = fresh();
     s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
     s.stats.peakCrs = 0;
@@ -55,11 +72,12 @@ describe('ScoringSystem', () => {
     s.stats.time = 100;
     s.currency = 400;
     const r = computeScore(s);
-    expect(r.score).toBeGreaterThanOrEqual(SCORING.grades[0][0]);
-    expect(r.grade).toBe('S');
+    expect(r.score).toBeGreaterThanOrEqual(SCORING.responses[0][0]);
+    expect(r.response.id).toBe('sCR');
+    expect(r.response.fullName).toBe('Stringent complete response');
   });
 
-  it('demotes high scores to C when the run was lost', () => {
+  it('caps a high-scoring non-progression loss at SD', () => {
     const s = fresh();
     s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
     s.stats.peakCrs = 0;
@@ -68,7 +86,20 @@ describe('ScoringSystem', () => {
     s.stats.time = 100;
     s.currency = 400;
     s.phase = 'lost';
-    expect(computeScore(s).grade).toBe('C');
+    expect(computeScore(s).response.id).toBe('SD');
+  });
+
+  it('assigns PD when the hepatic core escapes regardless of score', () => {
+    const s = fresh();
+    s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
+    s.stats.peakCrs = 0;
+    s.stats.lowestFitness = 100;
+    s.stats.kills = 999;
+    s.stats.time = 100;
+    s.currency = 400;
+    s.phase = 'lost';
+    s.bossEscaped = true;
+    expect(computeScore(s).response.id).toBe('PD');
   });
 
   it('scores a collapsed body at zero', () => {
@@ -83,6 +114,6 @@ describe('ScoringSystem', () => {
     s.currency = 0;
     const r = computeScore(s);
     expect(r.score).toBe(0);
-    expect(r.grade).toBe('C');
+    expect(r.response.id).toBe('PD');
   });
 });

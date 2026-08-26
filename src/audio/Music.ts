@@ -1,12 +1,14 @@
 // Adaptive, asset-free biological synthwave score. Composition data is pure and
 // validated in tests; WebAudio is created only after a user gesture.
 import type { Settings } from '../lib/storage';
+import type { LevelId } from '../game/types';
 import { INTRO_BPM } from '../lib/introTiming';
 
 export type MusicScene =
   | 'menu'
   | 'planning'
   | 'wave'
+  | 'boss'
   | 'danger'
   | 'iecHs'
   | 'paused'
@@ -31,9 +33,18 @@ export type MusicEvent =
   | 'introInfusion'
   | 'introBattle'
   | 'victory'
-  | 'loss';
+  | 'loss'
+  | 'hepaticSelect'
+  | 'flareWarn'
+  | 'flareImpact'
+  | 'division'
+  | 'obstruction'
+  | 'shieldBreak'
+  | 'bossPhase2'
+  | 'bossPhase3';
 
 export interface MusicSnapshot {
+  level: LevelId;
   scene: MusicScene;
   wave: number;
   intensity: number;
@@ -42,11 +53,20 @@ export interface MusicSnapshot {
   hematotoxicity: number;
   fitness: number;
   leakHeat: number;
+  bossPhase: number;
+  hepaticEventPressure: number;
 }
 
 export type Pattern = ReadonlyArray<string | null>;
 export type DrumPattern = ReadonlyArray<'x' | 'o' | null>;
 export type Chord = ReadonlyArray<string>;
+
+export interface MelodicEvent {
+  step: number;
+  note: string;
+  length: number;
+  velocity: number;
+}
 
 export interface ArrangementSection {
   name: string;
@@ -56,10 +76,18 @@ export interface ArrangementSection {
   counter: Pattern;
   arp: Pattern;
   brass?: Pattern;
+  strings?: Pattern;
+  melody?: ReadonlyArray<MelodicEvent>;
+  leadDouble?: ReadonlyArray<MelodicEvent>;
+  solo?: ReadonlyArray<MelodicEvent>;
   kick: DrumPattern;
   snare: DrumPattern;
   hat: DrumPattern;
   texture: DrumPattern;
+  tom?: DrumPattern;
+  stepsPerChord?: number;
+  filterScale?: number;
+  layerLevels?: Partial<Record<Layer, number>>;
 }
 
 export interface SceneArrangement {
@@ -68,6 +96,12 @@ export interface SceneArrangement {
   sections: ReadonlyArray<ArrangementSection>;
   density: number;
   brightness: number;
+  bossPhaseOrders?: Partial<Record<1 | 2 | 3, ReadonlyArray<number>>>;
+  waveTierOrders?: Partial<Record<1 | 2 | 3, ReadonlyArray<number>>>;
+}
+
+export interface MusicCueOptions {
+  pan?: number;
 }
 
 export interface VoiceDefinition {
@@ -78,7 +112,7 @@ export interface VoiceDefinition {
   gain: number;
 }
 
-type Layer = 'bass' | 'pad' | 'lead' | 'counter' | 'arp' | 'brass' | 'drums' | 'texture';
+export type Layer = 'bass' | 'pad' | 'lead' | 'counter' | 'arp' | 'brass' | 'strings' | 'solo' | 'drums' | 'texture';
 
 export const VOICE_LIMIT = 48;
 export const DUCK_GAIN = 0.65;
@@ -92,6 +126,8 @@ const pattern = (entries: Record<number, string>): Pattern =>
 const drums = (entries: Record<number, 'x' | 'o'>): DrumPattern =>
   Array.from({ length: STEPS_PER_PHRASE }, (_, i) => entries[i] ?? null);
 const chord = (...notes: string[]): Chord => notes;
+const melody = (...events: Array<[number, string, number, number]>): ReadonlyArray<MelodicEvent> =>
+  events.map(([step, note, length, velocity]) => ({ step, note, length, velocity }));
 
 const KICK = drums({ 0: 'o', 4: 'x', 8: 'o', 12: 'x', 16: 'o', 20: 'x', 24: 'o', 28: 'x' });
 const SNARE = drums({ 4: 'o', 12: 'o', 20: 'o', 28: 'o' });
@@ -250,7 +286,7 @@ const loss: ArrangementSection = {
   hat: drums({ 7: 'x', 15: 'o', 23: 'x', 31: 'o' }),
 };
 
-export const ARRANGEMENTS: Record<MusicScene, SceneArrangement> = {
+export const ARRANGEMENTS: Record<Exclude<MusicScene, 'boss'>, SceneArrangement> = {
   menu: { bpm: INTRO_BPM, order: [0, 0, 1, 0, 2], sections: [cinematicOpening, cinematicAscent, cinematicResolve], density: 0.82, brightness: 0.8 },
   planning: { bpm: 92, order: [0, 1], sections: [planningMain, planningLift], density: 0.55, brightness: 0.7 },
   wave: { bpm: 118, order: [0, 0, 1, 0], sections: [waveMain, waveLift], density: 0.82, brightness: 0.78 },
@@ -261,6 +297,303 @@ export const ARRANGEMENTS: Record<MusicScene, SceneArrangement> = {
   loss: { bpm: 76, order: [0], sections: [loss], density: 0.28, brightness: 0.25 },
 };
 
+// Hepatic Drive: one authored 80-bar synthwave form in F# natural minor.
+// Every two-bar section owns one chord per bar; pairing tonic and answer
+// sections preserves F#m | E | D | E for the entire loop.
+export const HEPATIC_LEITMOTIF = ['F#4', 'A4', 'B4', 'C#5', 'E5', 'G#5', 'F#5', 'E5'] as const;
+export const HEPATIC_ANSWER = ['D5', 'F#5', 'E5', 'D5', 'E5', 'G#5', 'A5', 'B5', 'G#5'] as const;
+export const HEPATIC_SCALE = ['F#', 'G#', 'A', 'B', 'C#', 'D', 'E'] as const;
+
+export const HEPATIC_CHORDS = {
+  tonic: chord('F#2', 'C#3', 'F#3', 'A3', 'C#4'),
+  subtonic: chord('E2', 'B2', 'E3', 'G#3', 'B3'),
+  submediant: chord('D2', 'A2', 'D3', 'F#3', 'A3'),
+} as const;
+
+const M = melody(
+  [0, 'F#4', 4, .9], [8, 'A4', 2, .92], [10, 'B4', 2, .86], [12, 'C#5', 4, .94],
+  [16, 'E5', 4, .9], [20, 'G#5', 2, .94], [22, 'F#5', 2, .88], [24, 'E5', 8, .92],
+);
+const M_VARIATION = melody(
+  [0, 'F#4', 4, .9], [8, 'A4', 2, .92], [10, 'B4', 2, .86], [12, 'C#5', 4, .94],
+  [16, 'E5', 4, .9], [20, 'G#5', 2, .94], [22, 'F#5', 2, .88], [24, 'B4', 4, .9], [28, 'E5', 4, .94],
+);
+const Q = melody(
+  [0, 'D5', 4, .9], [8, 'F#5', 2, .94], [10, 'E5', 2, .86], [12, 'D5', 4, .9],
+  [16, 'E5', 4, .9], [20, 'G#5', 2, .94], [22, 'A5', 2, .88], [24, 'B5', 4, .96], [28, 'G#5', 4, .92],
+);
+const Q_CADENCE = melody(
+  [0, 'D5', 4, .9], [8, 'F#5', 2, .94], [10, 'E5', 2, .86], [12, 'D5', 4, .9],
+  [16, 'E5', 4, .9], [20, 'G#5', 2, .94], [22, 'F#5', 2, .88], [24, 'E5', 8, .94],
+);
+const D1 = melody(
+  [0, 'C#5', 4, .9], [8, 'A4', 2, .9], [10, 'B4', 2, .86], [12, 'C#5', 4, .92],
+  [16, 'B4', 4, .9], [20, 'E5', 2, .9], [22, 'F#5', 2, .86], [24, 'G#5', 4, .94], [28, 'E5', 4, .9],
+);
+const D2 = melody(
+  [0, 'A4', 4, .9], [8, 'F#4', 2, .88], [10, 'G#4', 2, .84], [12, 'A4', 4, .92],
+  [16, 'B4', 4, .9], [20, 'G#4', 2, .9], [22, 'A4', 2, .86], [24, 'B4', 4, .92], [28, 'E5', 4, .94],
+);
+
+const INTRO_TEASERS = [
+  melody([0, 'F#4', 8, .52], [12, 'C#5', 4, .56], [16, 'E5', 8, .54]),
+  melody([0, 'D5', 8, .54], [8, 'F#5', 4, .56], [16, 'E5', 4, .54], [24, 'B5', 8, .58]),
+  melody([0, 'F#4', 4, .58], [8, 'A4', 2, .6], [10, 'B4', 2, .56], [12, 'C#5', 4, .62], [16, 'E5', 8, .6]),
+  melody([0, 'D5', 4, .6], [8, 'F#5', 2, .62], [10, 'E5', 2, .56], [12, 'D5', 4, .6], [16, 'E5', 8, .62]),
+] as const;
+const OUTRO_FRAGMENTS = [
+  melody([0, 'F#4', 4, .7], [12, 'C#5', 4, .72], [16, 'E5', 8, .7]),
+  melody([0, 'D5', 8, .68], [8, 'F#5', 4, .7], [16, 'E5', 4, .68], [24, 'B5', 8, .7]),
+  melody([0, 'F#4', 8, .64], [12, 'C#5', 4, .66], [16, 'E5', 8, .64]),
+  melody([0, 'D5', 8, .58], [12, 'A4', 4, .6], [16, 'E5', 12, .62]),
+] as const;
+
+type HepaticPhrase = 'M' | 'Q' | 'M\'' | 'Qcad' | 'D1' | 'D2';
+const PHRASES: Record<HepaticPhrase, ReadonlyArray<MelodicEvent>> = {
+  M, Q, "M'": M_VARIATION, Qcad: Q_CADENCE, D1, D2,
+};
+export const HEPATIC_A_SEQUENCE: ReadonlyArray<HepaticPhrase> = ['M', 'Q', 'M', 'Qcad', 'M', 'Q', "M'", 'Qcad'];
+export const HEPATIC_B_SEQUENCE: ReadonlyArray<HepaticPhrase> = ['D1', 'D2', 'D1', 'Qcad', "M'", 'D2', 'M', 'Qcad'];
+
+const EMPTY_PATTERN = pattern({});
+const SYNTHWAVE_KICK = drums({ 0: 'o', 4: 'x', 8: 'x', 12: 'x', 16: 'o', 20: 'x', 24: 'x', 28: 'x' });
+const SYNTHWAVE_KICK_STRONG = drums({ 0: 'o', 4: 'o', 8: 'x', 12: 'o', 16: 'o', 20: 'o', 24: 'x', 28: 'o' });
+const SYNTHWAVE_SNARE = drums({ 4: 'o', 12: 'o', 20: 'o', 28: 'o' });
+const SYNTHWAVE_HAT = drums({ 2: 'x', 6: 'x', 10: 'x', 14: 'o', 18: 'x', 22: 'x', 26: 'x', 30: 'o' });
+const SYNTHWAVE_PEAK_HAT = drums({ 0: 'x', 2: 'x', 4: 'x', 6: 'x', 8: 'x', 10: 'x', 12: 'x', 14: 'o', 16: 'x', 18: 'x', 20: 'x', 22: 'x', 24: 'x', 26: 'x', 28: 'x', 30: 'o' });
+const SYNTHWAVE_FILL = drums({ 25: 'x', 27: 'x', 29: 'o', 31: 'o' });
+
+const phraseHarmony = (index: number): ReadonlyArray<Chord> => index % 2 === 0
+  ? [HEPATIC_CHORDS.tonic, HEPATIC_CHORDS.subtonic]
+  : [HEPATIC_CHORDS.submediant, HEPATIC_CHORDS.subtonic];
+const arpBar = (notes: readonly string[]): string[] =>
+  Array.from({ length: 16 }, (_, step) => notes[step % notes.length]);
+const hepaticArp = (index: number): Pattern => [
+  ...arpBar(index % 2 === 0 ? ['F#4', 'C#5', 'A4', 'C#5'] : ['D4', 'A4', 'F#4', 'A4']),
+  ...arpBar(['E4', 'B4', 'G#4', 'B4']),
+];
+const bassBar = (root: string, fifth: string, octave: string): Pattern => {
+  const notes = [root, root, fifth, root, octave, root, fifth, root];
+  return Array.from({ length: 16 }, (_, step) => step % 2 === 0 ? notes[step / 2] : null);
+};
+const hepaticBass = (index: number): Pattern => [
+  ...bassBar(...(index % 2 === 0 ? ['F#2', 'C#3', 'F#3'] : ['D2', 'A2', 'D3']) as [string, string, string]),
+  ...bassBar('E2', 'B2', 'E3'),
+];
+const upperDoubling = (events: ReadonlyArray<MelodicEvent>): ReadonlyArray<MelodicEvent> =>
+  events.filter((event) => event.step < 16).map((event) => ({
+    ...event,
+    note: ({ 'F#4': 'F#5', A4: 'A5', B4: 'B5', 'C#5': 'C#6' } as Record<string, string>)[event.note] ?? event.note,
+    velocity: event.velocity * .55,
+  }));
+
+interface HepaticSectionOptions {
+  melody: ReadonlyArray<MelodicEvent>;
+  drums?: 'none' | 'drive' | 'peak';
+  bass?: boolean;
+  double?: boolean;
+  fill?: boolean;
+  filterScale: number;
+  arpLevel?: number;
+}
+
+const hepaticSection = (index: number, name: string, options: HepaticSectionOptions): ArrangementSection => {
+  const drumMode = options.drums ?? 'drive';
+  return {
+    name,
+    chords: phraseHarmony(index),
+    stepsPerChord: 16,
+    filterScale: options.filterScale,
+    layerLevels: { arp: options.arpLevel ?? .62, pad: .92, lead: 1.12, bass: 1.04, drums: drumMode === 'peak' ? 1.12 : 1 },
+    bass: options.bass === false ? EMPTY_PATTERN : hepaticBass(index),
+    lead: EMPTY_PATTERN,
+    melody: options.melody,
+    leadDouble: options.double ? upperDoubling(options.melody) : undefined,
+    counter: EMPTY_PATTERN,
+    arp: hepaticArp(index),
+    brass: EMPTY_PATTERN,
+    strings: EMPTY_PATTERN,
+    kick: drumMode === 'none' ? EMPTY_DRUMS : drumMode === 'peak' ? SYNTHWAVE_KICK_STRONG : SYNTHWAVE_KICK,
+    snare: drumMode === 'none' ? EMPTY_DRUMS : SYNTHWAVE_SNARE,
+    hat: drumMode === 'none' ? EMPTY_DRUMS : drumMode === 'peak' ? SYNTHWAVE_PEAK_HAT : SYNTHWAVE_HAT,
+    texture: drums({ 0: 'x', 16: 'x' }),
+    tom: options.fill ? SYNTHWAVE_FILL : EMPTY_DRUMS,
+  };
+};
+
+const hepaticSections: ArrangementSection[] = [];
+INTRO_TEASERS.forEach((events, index) => hepaticSections.push(hepaticSection(index, `intro-${index + 1}`, {
+  melody: events, drums: 'none', bass: false, filterScale: .5 + index * .09, arpLevel: .42 + index * .05,
+})));
+const appendSequence = (
+  label: string,
+  sequence: ReadonlyArray<HepaticPhrase>,
+  options: { double: boolean; filterScale: number; peak?: boolean },
+): void => {
+  sequence.forEach((phrase, phraseIndex) => {
+    const sectionIndex = hepaticSections.length;
+    const endBar = (sectionIndex + 1) * 2;
+    hepaticSections.push(hepaticSection(sectionIndex, `${label}-${phraseIndex + 1}-${phrase}`, {
+      melody: PHRASES[phrase],
+      double: options.double && sectionIndex % 2 === 0,
+      drums: options.peak ? 'peak' : 'drive',
+      fill: [24, 40, 56, 72].includes(endBar),
+      filterScale: options.filterScale,
+      arpLevel: options.peak ? .7 : .58,
+    }));
+  });
+};
+appendSequence('a', HEPATIC_A_SEQUENCE, { double: false, filterScale: .82 });
+appendSequence('a-prime', HEPATIC_A_SEQUENCE, { double: true, filterScale: .98, peak: true });
+appendSequence('b', HEPATIC_B_SEQUENCE, { double: false, filterScale: .88 });
+appendSequence('a-return', HEPATIC_A_SEQUENCE, { double: true, filterScale: 1.12, peak: true });
+OUTRO_FRAGMENTS.forEach((events, index) => {
+  const sectionIndex = hepaticSections.length;
+  hepaticSections.push(hepaticSection(sectionIndex, `outro-${index + 1}`, {
+    melody: events,
+    drums: index >= 2 ? 'none' : 'drive',
+    bass: index < 3,
+    filterScale: .78 - index * .1,
+    arpLevel: .5 - index * .08,
+  }));
+});
+
+export const HEPATIC_FORM_SECTIONS: ReadonlyArray<ArrangementSection> = hepaticSections;
+export const HEPATIC_FORM_ORDER: ReadonlyArray<number> = hepaticSections.map((_, index) => index);
+
+const hepaticVictorySections = [
+  hepaticSection(0, 'victory-motif', { melody: M, double: true, filterScale: 1, drums: 'drive' }),
+  hepaticSection(1, 'victory-answer', { melody: Q_CADENCE, double: false, filterScale: 1.05, drums: 'drive' }),
+];
+const hepaticLossSections = [
+  hepaticSection(0, 'loss-motif', { melody: INTRO_TEASERS[0], filterScale: .55, drums: 'none' }),
+  hepaticSection(1, 'loss-answer', { melody: OUTRO_FRAGMENTS[3], filterScale: .45, drums: 'none', bass: false }),
+];
+
+const hepaticContinuous = (brightness: number): SceneArrangement => ({
+  bpm: 114,
+  order: HEPATIC_FORM_ORDER,
+  sections: HEPATIC_FORM_SECTIONS,
+  density: 1,
+  brightness,
+});
+
+export const HEPATIC_ARRANGEMENTS: Partial<Record<MusicScene, SceneArrangement>> = {
+  planning: hepaticContinuous(.78),
+  wave: hepaticContinuous(.86),
+  danger: hepaticContinuous(.86),
+  iecHs: hepaticContinuous(.86),
+  boss: hepaticContinuous(.86),
+  paused: hepaticContinuous(.68),
+  victory: { bpm: 114, order: [0, 1], sections: hepaticVictorySections, density: 1, brightness: .88 },
+  loss: { bpm: 114, order: [0, 1], sections: hepaticLossSections, density: 1, brightness: .48 },
+};
+
+const HEPATIC_STINGER_CHORDS = [
+  { low: ['F#2', 'C#3', 'A3'], high: ['F#4', 'A4', 'C#5'] },
+  { low: ['E2', 'B2', 'G#3'], high: ['E4', 'G#4', 'B4'] },
+  { low: ['D2', 'A2', 'F#3'], high: ['D4', 'F#4', 'A4'] },
+  { low: ['E2', 'B2', 'G#3'], high: ['E4', 'G#4', 'B4'] },
+] as const;
+
+export function hepaticStinger(event: MusicEvent, bar: number): ReadonlyArray<string> | undefined {
+  if (event === 'hepaticSelect') return ['F#2', 'C#3', 'A3', 'F#3'];
+  const tones = HEPATIC_STINGER_CHORDS[((bar % 4) + 4) % 4];
+  const shapes: Partial<Record<MusicEvent, ReadonlyArray<string>>> = {
+    waveStart: [tones.high[0], tones.high[1], tones.high[2]],
+    waveClear: [tones.high[2], tones.high[1], tones.high[0]],
+    leak: [tones.low[1], tones.low[0]],
+    warning: [tones.low[0], tones.low[1], tones.low[2], tones.low[0]],
+    toci: [tones.high[0], tones.high[1]], dexa: [tones.high[2], tones.high[0]],
+    stemcell: [tones.low[0], tones.low[2], tones.high[0]],
+    victory: [tones.high[0], tones.high[2], tones.high[1], tones.high[0]],
+    loss: [tones.high[1], tones.high[2], tones.high[0]],
+    iecHsOnset: [tones.low[0], tones.low[1], tones.low[2], tones.high[0]],
+    anakinra: [tones.low[2], tones.high[0], tones.high[1]], gcsf: [tones.high[0], tones.high[2], tones.high[1]],
+    flareWarn: [tones.high[0], tones.high[1], tones.high[2], tones.high[0]],
+    flareImpact: [tones.low[0], tones.low[1], tones.low[0]],
+    division: [tones.high[0], tones.high[2], tones.high[1], tones.high[0]],
+    obstruction: [tones.low[1], tones.low[2], tones.low[0]],
+    shieldBreak: [tones.low[0], tones.low[2], tones.high[0], tones.high[1]],
+    bossPhase2: [tones.low[0], tones.low[2], tones.low[1], tones.high[0]],
+    bossPhase3: [tones.high[0], tones.high[2], tones.high[1], tones.high[0]],
+  };
+  return shapes[event];
+}
+
+export function hepaticWaveTier(wave: number): 1 | 2 | 3 {
+  if (wave >= 7) return 3;
+  if (wave >= 4) return 2;
+  return 1;
+}
+
+export type HepaticWavePhase = 'planning' | 'combat';
+
+export interface HepaticWaveProfile {
+  wave: number;
+  phase: HepaticWavePhase;
+  tier: 1 | 2 | 3 | 4;
+  filter: number;
+  bass: number;
+  arp: number;
+  drums: number;
+  lead: number;
+  doubling: number;
+  fullerHats: boolean;
+}
+
+const lerp = (from: number, to: number, amount: number): number => from + (to - from) * amount;
+
+export function hepaticWaveProfile(
+  wave: number,
+  phase: HepaticWavePhase,
+  bossPhase: number,
+): HepaticWaveProfile {
+  const boundedWave = Math.max(1, Math.min(10, Math.round(wave)));
+  const energy = (boundedWave - 1) / 9;
+  const tier: HepaticWaveProfile['tier'] = boundedWave >= 10 || bossPhase > 0
+    ? 4
+    : boundedWave >= 7 ? 3 : boundedWave >= 4 ? 2 : 1;
+  if (phase === 'planning') {
+    return {
+      wave: boundedWave,
+      phase,
+      tier,
+      filter: lerp(.68, .76, energy),
+      bass: lerp(.5, .6, energy),
+      arp: lerp(.48, .56, energy),
+      drums: 0,
+      lead: .78,
+      doubling: 0,
+      fullerHats: false,
+    };
+  }
+  return {
+    wave: boundedWave,
+    phase,
+    tier,
+    filter: lerp(.82, 1.1, energy),
+    bass: lerp(.88, 1.1, energy),
+    arp: lerp(.76, 1, energy),
+    drums: lerp(.82, 1.1, energy),
+    lead: lerp(.96, 1.08, energy),
+    doubling: Math.max(0, Math.min(1, (boundedWave - 3) / 7)),
+    fullerHats: boundedWave >= 7,
+  };
+}
+
+function sameHepaticProfile(a: HepaticWaveProfile, b: HepaticWaveProfile): boolean {
+  return a.wave === b.wave && a.phase === b.phase && a.tier === b.tier
+    && a.filter === b.filter && a.bass === b.bass && a.arp === b.arp
+    && a.drums === b.drums && a.lead === b.lead && a.doubling === b.doubling
+    && a.fullerHats === b.fullerHats;
+}
+
+export function arrangementFor(level: LevelId, scene: MusicScene): SceneArrangement {
+  if (level === 'liver') return HEPATIC_ARRANGEMENTS[scene] ?? ARRANGEMENTS[scene === 'boss' ? 'wave' : scene];
+  return ARRANGEMENTS[scene === 'boss' ? 'wave' : scene];
+}
+
 export const VOICES: Record<Exclude<Layer, 'drums' | 'texture'>, VoiceDefinition> = {
   bass: { attack: 0.012, release: 0.22, cutoff: 720, resonance: 2.5, gain: 0.17 },
   pad: { attack: 0.22, release: 0.8, cutoff: 1800, resonance: 1.2, gain: 0.045 },
@@ -268,6 +601,19 @@ export const VOICES: Record<Exclude<Layer, 'drums' | 'texture'>, VoiceDefinition
   counter: { attack: 0.025, release: 0.32, cutoff: 4200, resonance: 1.4, gain: 0.055 },
   arp: { attack: 0.006, release: 0.12, cutoff: 5200, resonance: 4, gain: 0.052 },
   brass: { attack: 0.08, release: 0.65, cutoff: 2100, resonance: 2.1, gain: 0.062 },
+  strings: { attack: 0.16, release: 0.72, cutoff: 2600, resonance: 1.1, gain: 0.052 },
+  solo: { attack: 0.04, release: 0.7, cutoff: 1900, resonance: 2, gain: 0.08 },
+};
+
+export const HEPATIC_VOICES: Partial<Record<Exclude<Layer, 'drums' | 'texture'>, VoiceDefinition>> = {
+  bass: { attack: 0.004, release: 0.11, cutoff: 680, resonance: 4.6, gain: 0.18 },
+  pad: { attack: 0.3, release: 1.2, cutoff: 1450, resonance: 1.5, gain: 0.044 },
+  lead: { attack: 0.012, release: 0.3, cutoff: 4300, resonance: 2.4, gain: 0.086 },
+  counter: { attack: 0.006, release: 0.16, cutoff: 3500, resonance: 2.8, gain: 0.035 },
+  arp: { attack: 0.004, release: 0.075, cutoff: 4200, resonance: 3.2, gain: 0.022 },
+  brass: { attack: 0.035, release: 0.42, cutoff: 1550, resonance: 3.8, gain: 0.04 },
+  strings: { attack: 0.24, release: 1.1, cutoff: 1750, resonance: 1.2, gain: 0.028 },
+  solo: { attack: 0.01, release: 0.28, cutoff: 3400, resonance: 2.9, gain: 0.085 },
 };
 
 export function noteFrequency(note: string): number {
@@ -282,7 +628,7 @@ export function noteFrequency(note: string): number {
 }
 
 export function resolveMusicScene(snapshot: MusicSnapshot): MusicScene {
-  if (snapshot.scene === 'menu' || snapshot.scene === 'paused' || snapshot.scene === 'victory' || snapshot.scene === 'loss') return snapshot.scene;
+  if (snapshot.scene === 'menu' || snapshot.scene === 'paused' || snapshot.scene === 'victory' || snapshot.scene === 'loss' || snapshot.scene === 'boss') return snapshot.scene;
   if (snapshot.scene === 'iecHs') return 'iecHs';
   if (snapshot.crs >= 65 || snapshot.neuro >= 65 || snapshot.hematotoxicity >= 65 || snapshot.fitness <= 30) return 'danger';
   return snapshot.scene === 'wave' ? 'wave' : 'planning';
@@ -305,6 +651,19 @@ function safeStop(node: AudioScheduledSourceNode, at: number): void {
   try { node.stop(at); } catch { /* source may already be stopped */ }
 }
 
+function saturationCurve(amount: number): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(new ArrayBuffer(256 * Float32Array.BYTES_PER_ELEMENT));
+  const scale = Math.tanh(amount);
+  for (let index = 0; index < curve.length; index += 1) {
+    const input = index * 2 / (curve.length - 1) - 1;
+    curve[index] = Math.tanh(input * amount) / scale;
+  }
+  return curve;
+}
+
+const HEPATIC_DRIVE_CURVE = saturationCurve(2.4);
+const HEPATIC_REDLINE_CURVE = saturationCurve(4.2);
+
 export class Music {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -312,19 +671,29 @@ export class Music {
   private compressor: DynamicsCompressorNode | null = null;
   private reverb: ConvolverNode | null = null;
   private delay: DelayNode | null = null;
+  private tonalDuck: GainNode | null = null;
   private layerBuses: Partial<Record<Layer, GainNode>> = {};
   private noiseBuffer: AudioBuffer | null = null;
   private impulseBuffer: AudioBuffer | null = null;
   private enabled = true;
   private volume = 0.6;
   private scene: MusicScene = 'menu';
+  private level: LevelId = 'marrow';
   private pendingScene: MusicScene | null = null;
+  private bossPhase = 0;
+  private pendingBossPhase = 0;
+  private waveTier: 1 | 2 | 3 = 1;
+  private hepaticEventPressure = 0;
+  private hepaticProfile = hepaticWaveProfile(1, 'planning', 0);
+  private pendingHepaticProfile: HepaticWaveProfile | null = null;
+  private pendingWaveTransition: 'start' | 'clear' | null = null;
   private intensity = 0.3;
   private step = 0;
   private nextTime = 0;
   private interval: ReturnType<typeof setInterval> | null = null;
   private activeVoices = 0;
   private lastLeadFrequency = 0;
+  private lastSoloFrequency = 0;
 
   unlock(): void {
     this.ensure();
@@ -347,11 +716,27 @@ export class Music {
 
   update(snapshot: MusicSnapshot): void {
     this.intensity = smoothIntensity(this.intensity, snapshot.intensity);
+    this.level = snapshot.level;
+    this.waveTier = hepaticWaveTier(snapshot.wave);
+    this.hepaticEventPressure = Math.max(0, Math.min(1, snapshot.hepaticEventPressure));
+    const nextBossPhase = Math.max(0, Math.min(3, Math.round(snapshot.bossPhase)));
+    if (nextBossPhase !== this.bossPhase) this.pendingBossPhase = nextBossPhase;
     const next = resolveMusicScene(snapshot);
+    if (snapshot.level === 'liver' && next !== 'menu' && next !== 'victory' && next !== 'loss') {
+      const phase: HepaticWavePhase = next === 'planning'
+        ? 'planning'
+        : next === 'paused' ? this.hepaticProfile.phase : 'combat';
+      const profile = hepaticWaveProfile(snapshot.wave, phase, nextBossPhase);
+      if (!sameHepaticProfile(profile, this.hepaticProfile)) this.pendingHepaticProfile = profile;
+    }
     if (next === this.scene || next === this.pendingScene) return;
     if (next === 'victory' || next === 'loss' || !this.interval) {
       this.scene = next;
       this.pendingScene = null;
+      if (next === 'victory' || next === 'loss') {
+        this.pendingHepaticProfile = null;
+        this.pendingWaveTransition = null;
+      }
       this.step = 0;
       if (this.ctx) this.nextTime = this.ctx.currentTime + 0.05;
       this.syncDelay();
@@ -360,7 +745,7 @@ export class Music {
     }
   }
 
-  trigger(event: MusicEvent): void {
+  trigger(event: MusicEvent, options: MusicCueOptions = {}): void {
     this.ensure();
     if (!this.ctx || !this.duck || !this.enabled) return;
     const now = this.ctx.currentTime + 0.01;
@@ -368,7 +753,7 @@ export class Music {
     this.duck.gain.setValueAtTime(1, now);
     this.duck.gain.linearRampToValueAtTime(DUCK_GAIN, now + 0.025);
     this.duck.gain.setTargetAtTime(1, now + DUCK_SECONDS, 0.08);
-    const notes: Record<MusicEvent, string[]> = {
+    const notes: Partial<Record<MusicEvent, ReadonlyArray<string>>> = {
       waveStart: ['A3', 'E4', 'A4'], waveClear: ['A4', 'C5', 'E5'],
       leak: ['F3', 'E3'], warning: ['E3', 'F3', 'A#3'],
       toci: ['E5', 'A5'], dexa: ['D4', 'A4'], stemcell: ['C4', 'E4', 'A4'],
@@ -383,15 +768,57 @@ export class Music {
       introBattle: ['A2', 'E3', 'A3', 'C4', 'E4'],
       loss: ['E4', 'C4', 'A3'],
     };
-    notes[event].forEach((note, i) => {
-      this.tone('counter', noteFrequency(note), now + i * 0.055, 0.28 + i * 0.04, i % 2 ? 0.35 : -0.35, 1.15);
+    const hepaticCue = event === 'hepaticSelect' || (this.level === 'liver' && this.scene !== 'menu');
+    if (hepaticCue && event === 'waveStart') this.pendingWaveTransition = 'start';
+    if (hepaticCue && event === 'waveClear') this.pendingWaveTransition = 'clear';
+    const spacing = hepaticCue ? 0.085 : 0.055;
+    const sequence = hepaticCue ? hepaticStinger(event, Math.floor(this.step / STEPS_PER_BAR)) ?? [] : notes[event] ?? [];
+    const cuePan = Math.max(-0.75, Math.min(0.75, options.pan ?? 0));
+    sequence.forEach((note, i) => {
+      const pan = hepaticCue ? cuePan : i % 2 ? 0.35 : -0.35;
+      this.tone('counter', noteFrequency(note), now + i * spacing, 0.24 + i * 0.025, pan, hepaticCue ? 0.86 : 1.15);
     });
+    if (event === 'flareImpact' || event === 'bossPhase2' || event === 'bossPhase3') {
+      this.kick(now, true);
+      this.tom(now + 0.08, true);
+      const impactRoot = hepaticStinger(event, Math.floor(this.step / STEPS_PER_BAR))?.[0] ?? 'F#2';
+      this.tone('brass', noteFrequency(impactRoot), now, 0.7, cuePan, 1.12);
+    }
   }
 
   restartMenu(): void {
     this.scene = 'menu';
     this.pendingScene = null;
+    this.bossPhase = 0;
+    this.pendingBossPhase = 0;
+    this.hepaticEventPressure = 0;
+    this.pendingHepaticProfile = null;
+    this.pendingWaveTransition = null;
     this.step = 0;
+    if (this.ctx) {
+      this.nextTime = this.ctx.currentTime + 0.04;
+      this.syncDelay();
+    }
+  }
+
+  previewLevel(level: LevelId): void {
+    this.level = level;
+    if (level === 'liver') this.trigger('hepaticSelect');
+  }
+
+  startLevel(level: LevelId): void {
+    this.level = level;
+    this.scene = 'planning';
+    this.pendingScene = null;
+    this.bossPhase = 0;
+    this.pendingBossPhase = 0;
+    this.hepaticEventPressure = 0;
+    this.hepaticProfile = hepaticWaveProfile(1, 'planning', 0);
+    this.pendingHepaticProfile = null;
+    this.pendingWaveTransition = null;
+    this.step = 0;
+    this.lastLeadFrequency = 0;
+    this.lastSoloFrequency = 0;
     if (this.ctx) {
       this.nextTime = this.ctx.currentTime + 0.04;
       this.syncDelay();
@@ -413,6 +840,7 @@ export class Music {
     this.compressor = null;
     this.reverb = null;
     this.delay = null;
+    this.tonalDuck = null;
     this.activeVoices = 0;
   }
 
@@ -420,6 +848,12 @@ export class Music {
   get currentScene(): MusicScene { return this.scene; }
   get queuedScene(): MusicScene | null { return this.pendingScene; }
   get currentStep(): number { return this.step; }
+  get currentBossPhase(): number { return this.bossPhase; }
+  get queuedBossPhase(): number { return this.pendingBossPhase; }
+  get currentWaveTier(): 1 | 2 | 3 { return this.waveTier; }
+  get currentHepaticProfile(): HepaticWaveProfile { return this.hepaticProfile; }
+  get queuedHepaticProfile(): HepaticWaveProfile | null { return this.pendingHepaticProfile; }
+  get queuedWaveTransition(): 'start' | 'clear' | null { return this.pendingWaveTransition; }
 
   private ensure(): void {
     if (this.ctx || typeof window === 'undefined') return;
@@ -446,6 +880,9 @@ export class Music {
     const dry = ctx.createGain();
     dry.gain.value = 0.9;
     dry.connect(this.duck);
+    this.tonalDuck = ctx.createGain();
+    this.tonalDuck.gain.value = 1;
+    this.tonalDuck.connect(dry);
     this.reverb = ctx.createConvolver();
     this.reverb.buffer = this.impulse();
     const reverbReturn = ctx.createGain();
@@ -453,7 +890,7 @@ export class Music {
     this.reverb.connect(reverbReturn);
     reverbReturn.connect(this.duck);
     this.delay = ctx.createDelay(1.5);
-    this.delay.delayTime.value = 60 / ARRANGEMENTS[this.scene].bpm * 0.75;
+    this.delay.delayTime.value = 60 / arrangementFor(this.level, this.scene).bpm * 0.75;
     const delayReturn = ctx.createGain();
     delayReturn.gain.value = 0.13;
     const feedback = ctx.createGain();
@@ -465,14 +902,16 @@ export class Music {
 
     const levels: Record<Layer, number> = {
       bass: 1, pad: 1, lead: 1, counter: 1, arp: 1, brass: 1,
+      strings: 1, solo: 1,
       drums: 0.8, texture: 0.55,
     };
     for (const layer of Object.keys(levels) as Layer[]) {
       const bus = ctx.createGain();
       bus.gain.value = levels[layer];
-      bus.connect(dry);
+      if (layer === 'bass' || layer === 'drums' || layer === 'texture') bus.connect(dry);
+      else bus.connect(this.tonalDuck);
       if (layer !== 'bass' && layer !== 'drums') bus.connect(this.reverb);
-      if (layer === 'lead' || layer === 'counter' || layer === 'arp') bus.connect(this.delay);
+      if (layer === 'lead' || layer === 'counter' || layer === 'arp' || layer === 'solo') bus.connect(this.delay);
       this.layerBuses[layer] = bus;
     }
     this.nextTime = ctx.currentTime + 0.06;
@@ -494,12 +933,27 @@ export class Music {
     const ctx = this.ctx;
     if (!ctx || !this.enabled) return;
     while (this.nextTime < ctx.currentTime + LOOKAHEAD) {
-      if (this.step % STEPS_PER_BAR === 0 && this.pendingScene) {
-        this.scene = this.pendingScene;
-        this.pendingScene = null;
-        this.syncDelay();
+      if (this.step % STEPS_PER_BAR === 0) {
+        let profileChanged = false;
+        if (this.pendingScene) {
+          this.scene = this.pendingScene;
+          this.pendingScene = null;
+          this.syncDelay();
+        }
+        if (this.pendingBossPhase !== this.bossPhase) {
+          this.bossPhase = this.pendingBossPhase;
+        }
+        if (this.pendingHepaticProfile) {
+          this.hepaticProfile = this.pendingHepaticProfile;
+          this.pendingHepaticProfile = null;
+          profileChanged = true;
+        }
+        if (profileChanged && this.pendingWaveTransition) {
+          this.scheduleWaveTransition(this.nextTime, this.pendingWaveTransition);
+          this.pendingWaveTransition = null;
+        }
       }
-      const arrangement = ARRANGEMENTS[this.scene];
+      const arrangement = arrangementFor(this.level, this.scene);
       const stepDuration = 60 / arrangement.bpm / 4;
       this.schedule(arrangement, this.step, this.nextTime, stepDuration);
       this.step += 1;
@@ -509,81 +963,172 @@ export class Music {
 
   private schedule(arrangement: SceneArrangement, step: number, time: number, stepDuration: number): void {
     const phrase = Math.floor(step / STEPS_PER_PHRASE);
-    const sectionIndex = arrangement.order[phrase % arrangement.order.length];
+    const phaseOrder = this.scene === 'boss' && this.level === 'liver'
+      ? arrangement.bossPhaseOrders?.[Math.max(1, this.bossPhase) as 1 | 2 | 3]
+      : undefined;
+    const tierOrder = this.level === 'liver' && this.scene === 'wave'
+      ? arrangement.waveTierOrders?.[this.waveTier]
+      : undefined;
+    const sectionIndex = phaseOrder?.[phrase % phaseOrder.length]
+      ?? tierOrder?.[phrase % tierOrder.length]
+      ?? arrangement.order[phrase % arrangement.order.length];
     const section = arrangement.sections[sectionIndex];
     const index = step % STEPS_PER_PHRASE;
     const bar = Math.floor(step / STEPS_PER_BAR);
     const variation = variationIndex(bar);
-    const density = Math.min(1, arrangement.density * (0.72 + this.intensity * 0.38));
-    const chordNotes = section.chords[Math.floor(index / 8) % section.chords.length];
+    const continuousHepatic = this.level === 'liver'
+      && this.scene !== 'menu' && this.scene !== 'victory' && this.scene !== 'loss';
+    const density = continuousHepatic ? 1 : Math.min(
+      1,
+      arrangement.density * (0.72 + this.intensity * 0.38) + this.hepaticEventPressure * 0.1,
+    );
+    const brightness = arrangement.brightness;
+    const chordSpan = section.stepsPerChord ?? 8;
+    const chordNotes = section.chords[Math.floor(index / chordSpan) % section.chords.length];
+    const profile = continuousHepatic ? this.hepaticProfile : null;
+    const livePressure = profile ? Math.min(1,
+      this.intensity * .7 + this.hepaticEventPressure * .2 + Math.max(0, this.bossPhase - 1) / 20,
+    ) : 0;
+    const profileLevel = (layer: Layer): number => {
+      if (!profile) return 1;
+      if (layer === 'bass') return profile.bass * (1 + livePressure * .06);
+      if (layer === 'arp') return profile.arp;
+      if (layer === 'drums') return profile.drums * (1 + livePressure * .06);
+      if (layer === 'lead') return profile.lead;
+      return 1;
+    };
+    const level = (layer: Layer): number => (section.layerLevels?.[layer] ?? 1) * profileLevel(layer);
+    const filterScale = (section.filterScale ?? 1) * (profile?.filter ?? 1) * (1 + livePressure * .08);
 
-    if (index % 8 === 0) {
-      chordNotes.forEach((note, i) => this.tone('pad', noteFrequency(note), time, stepDuration * 8.4, -0.7 + i * 0.35, arrangement.brightness));
+    if (index % chordSpan === 0) {
+      chordNotes.forEach((note, i) => this.tone('pad', noteFrequency(note), time, stepDuration * (chordSpan + .4), -0.7 + i * 0.35, brightness, level('pad'), filterScale));
     }
     const bass = section.bass[index];
-    if (bass) this.tone('bass', noteFrequency(bass), time, stepDuration * 2.6, -0.12, Math.max(0.62, arrangement.brightness));
+    if (bass) this.tone(
+      'bass',
+      noteFrequency(bass),
+      time,
+      stepDuration * (this.level === 'liver' && (this.scene === 'wave' || this.scene === 'danger' || this.scene === 'boss') ? .82 : 2.6),
+      -0.12,
+      Math.max(0.58, brightness) * (this.level === 'liver' ? 1.16 : 1),
+      level('bass'),
+      filterScale,
+    );
 
-    const lead = section.lead[index];
-    if (lead && density >= 0.36 && (this.scene === 'menu' || (variation + index) % 13 !== 0)) {
-      const octave = this.scene === 'menu' ? 1 : variation % 8 === 7 ? 2 : 1;
-      this.tone('lead', noteFrequency(lead) * octave, time, stepDuration * 1.65, Math.sin(bar * 0.7) * 0.38, this.scene === 'menu' ? 1.22 : 1.05);
+    const melodicEvents = section.melody?.filter((event) => event.step === index);
+    if (melodicEvents?.length && density >= 0.34) {
+      for (const event of melodicEvents) {
+        const pan = Math.sin((bar + event.step) * 0.48) * 0.34;
+        this.tone('lead', noteFrequency(event.note), time, stepDuration * event.length, pan, event.velocity, level('lead'), filterScale);
+      }
+    } else if (!section.melody) {
+      const lead = section.lead[index];
+      if (lead && density >= 0.36 && (this.scene === 'menu' || (variation + index) % 13 !== 0)) {
+        const octave = this.scene === 'menu' ? 1 : variation % 8 === 7 ? 2 : 1;
+        this.tone('lead', noteFrequency(lead) * octave, time, stepDuration * 1.65, Math.sin(bar * 0.7) * 0.38, this.scene === 'menu' ? 1.22 : 1.05);
+      }
+    }
+    const doubledEvents = section.leadDouble?.filter((event) => event.step === index);
+    if (doubledEvents?.length && (!profile || profile.doubling > 0)) {
+      for (const event of doubledEvents) {
+        this.tone('lead', noteFrequency(event.note), time, stepDuration * event.length, -.24, event.velocity, level('lead') * (profile?.doubling ?? 1), filterScale);
+      }
     }
     const counter = section.counter[index];
-    if (counter && density >= 0.48) this.tone('counter', noteFrequency(counter), time, stepDuration * 2.1, 0.48, 0.9);
+    if (counter && density >= 0.48) this.tone('counter', noteFrequency(counter), time, stepDuration * 2.1, 0.48, 0.9, level('counter'), filterScale);
     const arp = section.arp[index];
-    if (arp && density >= 0.62) this.tone('arp', noteFrequency(arp), time, stepDuration * 0.8, index % 4 < 2 ? -0.52 : 0.52, 0.9);
+    if (arp && density >= 0.62) this.tone('arp', noteFrequency(arp), time, stepDuration * 0.8, index % 4 < 2 ? -0.52 : 0.52, 0.9, level('arp'), filterScale);
     const brass = section.brass?.[index];
-    if (brass && density >= 0.58) this.tone('brass', noteFrequency(brass), time, stepDuration * 7.5, index % 16 ? 0.2 : -0.2, 0.95);
+    if (brass && density >= 0.58) this.tone('brass', noteFrequency(brass), time, stepDuration * 7.5, index % 16 ? 0.2 : -0.2, 0.95, level('brass'), filterScale);
+    const strings = section.strings?.[index];
+    if (strings && density >= 0.44) this.tone('strings', noteFrequency(strings), time, stepDuration * 4.6, index % 8 ? 0.34 : -0.34, 0.88, level('strings'), filterScale);
+    const soloEvents = section.solo?.filter((event) => event.step === index);
+    if (soloEvents?.length && density >= 0.5) {
+      for (const event of soloEvents) {
+        this.tone('solo', noteFrequency(event.note), time, stepDuration * event.length, 0.18, event.velocity, level('solo'), filterScale);
+        if (this.level === 'liver' && this.scene === 'boss' && this.bossPhase >= 3) {
+          this.tone('solo', noteFrequency(event.note) * .5, time, stepDuration * event.length * .96, -0.18, event.velocity * .34);
+        }
+      }
+    }
 
-    if (density >= 0.55 && section.kick[index]) this.kick(time, section.kick[index] === 'o');
-    if (density >= 0.62 && section.snare[index]) this.snare(time, section.snare[index] === 'o');
-    if (density >= 0.72 && section.hat[index]) this.hat(time, section.hat[index] === 'o');
-    if (section.texture[index]) this.texture(time, stepDuration * 7, arrangement.brightness);
+    const drumLevel = level('drums');
+    const reactiveHat = profile?.fullerHats && index % 2 === 0 ? 'x' : null;
+    const hat = section.hat[index] ?? reactiveHat;
+    if (drumLevel > 0 && density >= 0.55 && section.kick[index]) this.kick(time, section.kick[index] === 'o', drumLevel);
+    if (drumLevel > 0 && density >= 0.62 && section.snare[index]) this.snare(time, section.snare[index] === 'o', drumLevel);
+    if (drumLevel > 0 && density >= 0.72 && hat) this.hat(time, hat === 'o', drumLevel);
+    if (drumLevel > 0 && density >= 0.66 && section.tom?.[index]) this.tom(time, section.tom[index] === 'o', drumLevel);
+    if (section.texture[index]) this.texture(time, stepDuration * 7, brightness);
   }
 
-  private tone(layer: Exclude<Layer, 'drums' | 'texture'>, frequency: number, time: number, duration: number, pan: number, velocity: number): void {
+  private tone(layer: Exclude<Layer, 'drums' | 'texture'>, frequency: number, time: number, duration: number, pan: number, velocity: number, level = 1, filterScale = 1): void {
     const ctx = this.ctx;
     const bus = this.layerBuses[layer];
     if (!ctx || !bus || frequency <= 0 || this.activeVoices >= VOICE_LIMIT) return;
-    const def = VOICES[layer];
+    const hepaticPlayback = this.level === 'liver' && this.scene !== 'menu';
+    const def = hepaticPlayback ? HEPATIC_VOICES[layer] ?? VOICES[layer] : VOICES[layer];
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     const panner = ctx.createStereoPanner();
     panner.pan.value = Math.max(-0.75, Math.min(0.75, pan));
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(def.cutoff * Math.max(0.55, velocity), time);
+    filter.frequency.setValueAtTime(def.cutoff * Math.max(0.55, velocity) * filterScale, time);
     filter.Q.value = def.resonance;
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(def.gain * velocity, time + def.attack);
+    gain.gain.exponentialRampToValueAtTime(def.gain * velocity * level, time + def.attack);
     gain.gain.setTargetAtTime(0.0001, Math.max(time + def.attack, time + duration - def.release), Math.max(0.015, def.release / 4));
-    filter.connect(gain);
+    const driven = hepaticPlayback
+      && (this.scene === 'wave' || this.scene === 'danger' || this.scene === 'boss')
+      && (layer === 'bass' || layer === 'solo');
+    const saturation = driven ? ctx.createWaveShaper() : null;
+    if (saturation) {
+      saturation.curve = this.scene === 'danger' || this.bossPhase >= 3
+        ? HEPATIC_REDLINE_CURVE
+        : HEPATIC_DRIVE_CURVE;
+      saturation.oversample = '2x';
+      filter.connect(saturation);
+      saturation.connect(gain);
+    } else {
+      filter.connect(gain);
+    }
     gain.connect(panner);
     panner.connect(bus);
 
-    const waves: Partial<Record<typeof layer, OscillatorType[]>> = {
+    const waves: Partial<Record<typeof layer, OscillatorType[]>> = hepaticPlayback ? {
+      bass: ['triangle', 'sawtooth'], pad: ['sawtooth', 'triangle'],
+      lead: ['sawtooth', 'square'], counter: ['triangle', 'sine'], arp: ['triangle', 'square'],
+      brass: ['sawtooth', 'triangle'], strings: ['triangle', 'sine'], solo: ['triangle', 'sawtooth'],
+    } : {
       bass: ['triangle', 'sawtooth'], pad: ['sine', 'triangle'],
       lead: ['sawtooth', 'square'], counter: ['sine', 'triangle'], arp: ['triangle', 'square'],
       brass: ['sawtooth', 'triangle'],
+      strings: ['sawtooth', 'triangle'],
+      solo: ['sawtooth', 'triangle'],
     };
-    const glideFrom = layer === 'lead' ? this.lastLeadFrequency : 0;
+    const glideFrom = layer === 'lead'
+      ? this.lastLeadFrequency
+      : layer === 'solo' ? this.lastSoloFrequency || frequency * .98 : 0;
     const oscillators = (waves[layer] ?? ['sine']).map((wave, i) => {
       const oscillator = ctx.createOscillator();
       oscillator.type = wave;
       oscillator.frequency.setValueAtTime(glideFrom || frequency, time);
-      if (glideFrom) oscillator.frequency.exponentialRampToValueAtTime(frequency, time + 0.045);
-      oscillator.detune.value = i === 0 ? -5 : 5;
+      if (glideFrom) oscillator.frequency.exponentialRampToValueAtTime(frequency, time + (layer === 'solo' ? .055 : hepaticPlayback ? .065 : .045));
+      const spread = hepaticPlayback && layer === 'solo' ? 7 : hepaticPlayback && layer === 'pad' ? 11 : hepaticPlayback && layer === 'lead' ? 7 : hepaticPlayback ? 3 : 5;
+      oscillator.detune.value = i === 0 ? -spread : i === 1 ? spread : 0;
       oscillator.connect(filter);
       oscillator.start(time);
       safeStop(oscillator, time + duration + def.release + 0.08);
       return oscillator;
     });
     if (layer === 'lead') this.lastLeadFrequency = frequency;
+    if (layer === 'solo') this.lastSoloFrequency = frequency;
     const modulationNodes: AudioNode[] = [];
-    if (layer === 'lead') {
+    if (layer === 'lead' || layer === 'strings' || layer === 'solo') {
       const vibrato = ctx.createOscillator();
       const vibratoGain = ctx.createGain();
-      vibrato.frequency.value = 5.2;
-      vibratoGain.gain.value = 7;
+      vibrato.frequency.value = layer === 'strings' ? 4.4 : layer === 'solo' ? 6 : 5.2;
+      vibratoGain.gain.value = layer === 'strings' ? 4 : layer === 'solo' ? 8 : 7;
       vibrato.connect(vibratoGain);
       for (const oscillator of oscillators) vibratoGain.connect(oscillator.detune);
       vibrato.start(time);
@@ -593,21 +1138,34 @@ export class Music {
     this.activeVoices += 1;
     const cleanup = (): void => {
       this.activeVoices = Math.max(0, this.activeVoices - 1);
-      for (const node of [...oscillators, ...modulationNodes, filter, gain, panner]) node.disconnect();
+      for (const node of [...oscillators, ...modulationNodes, filter, saturation, gain, panner]) node?.disconnect();
     };
     oscillators[0].onended = cleanup;
   }
 
-  private kick(time: number, strong: boolean): void {
+  private scheduleWaveTransition(time: number, transition: 'start' | 'clear'): void {
+    const stepDuration = 60 / arrangementFor(this.level, this.scene).bpm / 4;
+    if (transition === 'start') {
+      this.kick(time, true, 1.12);
+      this.hat(time + .012, true, 1.05);
+      return;
+    }
+    this.tom(time, true, .72);
+    this.texture(time, stepDuration * 8, .5);
+  }
+
+  private kick(time: number, strong: boolean, level = 1): void {
     const ctx = this.ctx;
     const bus = this.layerBuses.drums;
     if (!ctx || !bus || this.activeVoices >= VOICE_LIMIT) return;
+    if (this.level === 'liver' && this.scene !== 'menu') this.pumpTonalLayers(time, strong);
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(strong ? 145 : 110, time);
     oscillator.frequency.exponentialRampToValueAtTime(48, time + 0.13);
-    gain.gain.setValueAtTime(strong ? 0.34 : 0.22, time);
+    const hepaticPunch = this.level === 'liver' ? 1.12 : 1;
+    gain.gain.setValueAtTime((strong ? 0.34 : 0.22) * hepaticPunch * level, time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18);
     oscillator.connect(gain); gain.connect(bus);
     oscillator.start(time); safeStop(oscillator, time + 0.2);
@@ -615,7 +1173,15 @@ export class Music {
     oscillator.onended = () => { this.activeVoices = Math.max(0, this.activeVoices - 1); oscillator.disconnect(); gain.disconnect(); };
   }
 
-  private snare(time: number, strong: boolean): void {
+  private pumpTonalLayers(time: number, strong: boolean): void {
+    if (!this.tonalDuck) return;
+    const gain = this.tonalDuck.gain;
+    gain.setValueAtTime(1, time);
+    gain.linearRampToValueAtTime(strong ? 0.82 : 0.88, time + 0.022);
+    gain.setTargetAtTime(1, time + 0.045, 0.075);
+  }
+
+  private snare(time: number, strong: boolean, level = 1): void {
     const ctx = this.ctx;
     const bus = this.layerBuses.drums;
     if (!ctx || !bus || this.activeVoices >= VOICE_LIMIT) return;
@@ -623,15 +1189,55 @@ export class Music {
     const filter = ctx.createBiquadFilter();
     const gain = ctx.createGain();
     source.buffer = this.noise();
-    filter.type = 'bandpass'; filter.frequency.value = 1800; filter.Q.value = 0.7;
-    gain.gain.setValueAtTime(strong ? 0.18 : 0.11, time);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.16);
+    const hepaticGate = this.level === 'liver' && this.scene !== 'menu';
+    filter.type = 'bandpass'; filter.frequency.value = hepaticGate ? 1500 : 1800; filter.Q.value = hepaticGate ? 0.55 : 0.7;
+    gain.gain.setValueAtTime((strong ? (hepaticGate ? .25 : .18) : (hepaticGate ? .15 : .11)) * level, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + (hepaticGate ? .34 : .16));
     source.connect(filter); filter.connect(gain); gain.connect(bus);
-    source.start(time); safeStop(source, time + 0.18);
+    if (hepaticGate && this.reverb) gain.connect(this.reverb);
+    source.start(time); safeStop(source, time + (hepaticGate ? .36 : .18));
     this.trackTransient(source, source, filter, gain);
   }
 
-  private hat(time: number, open: boolean): void {
+  private tom(time: number, low: boolean, level = 1): void {
+    const ctx = this.ctx;
+    const bus = this.layerBuses.drums;
+    if (!ctx || !bus || this.activeVoices >= VOICE_LIMIT) return;
+    const oscillator = ctx.createOscillator();
+    const metallic = this.level === 'liver' && this.scene !== 'menu' ? ctx.createOscillator() : null;
+    const metallicGain = metallic ? ctx.createGain() : null;
+    const gain = ctx.createGain();
+    oscillator.type = metallic ? 'triangle' : 'sine';
+    oscillator.frequency.setValueAtTime(low ? 105 : 135, time);
+    oscillator.frequency.exponentialRampToValueAtTime(low ? 62 : 78, time + .16);
+    gain.gain.setValueAtTime((low ? .2 : .15) * level, time);
+    gain.gain.exponentialRampToValueAtTime(.0001, time + .24);
+    oscillator.connect(gain);
+    if (metallic && metallicGain) {
+      metallic.type = 'square';
+      metallic.frequency.setValueAtTime((low ? 105 : 135) * 2.71, time);
+      metallic.frequency.exponentialRampToValueAtTime((low ? 62 : 78) * 2.2, time + .11);
+      metallicGain.gain.setValueAtTime(.055 * level, time);
+      metallicGain.gain.exponentialRampToValueAtTime(.0001, time + .13);
+      metallic.connect(metallicGain);
+      metallicGain.connect(bus);
+      metallic.start(time);
+      safeStop(metallic, time + .15);
+    }
+    gain.connect(bus);
+    oscillator.start(time);
+    safeStop(oscillator, time + .26);
+    this.activeVoices += 1;
+    oscillator.onended = () => {
+      this.activeVoices = Math.max(0, this.activeVoices - 1);
+      oscillator.disconnect();
+      gain.disconnect();
+      metallic?.disconnect();
+      metallicGain?.disconnect();
+    };
+  }
+
+  private hat(time: number, open: boolean, level = 1): void {
     const ctx = this.ctx;
     const bus = this.layerBuses.drums;
     if (!ctx || !bus || this.activeVoices >= VOICE_LIMIT) return;
@@ -641,7 +1247,7 @@ export class Music {
     source.buffer = this.noise();
     filter.type = 'highpass'; filter.frequency.value = open ? 5200 : 7200;
     const duration = open ? 0.18 : 0.055;
-    gain.gain.setValueAtTime(open ? 0.09 : 0.055, time);
+    gain.gain.setValueAtTime((open ? 0.09 : 0.055) * level, time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     source.connect(filter); filter.connect(gain); gain.connect(bus);
     source.start(time); safeStop(source, time + duration + 0.02);
@@ -656,7 +1262,12 @@ export class Music {
     const filter = ctx.createBiquadFilter();
     const gain = ctx.createGain();
     source.buffer = this.noise();
-    filter.type = 'bandpass'; filter.frequency.value = 500 + brightness * 900; filter.Q.value = 8;
+    filter.type = 'bandpass';
+    const hepaticSweep = this.level === 'liver' && this.scene !== 'menu';
+    const baseFrequency = 500 + brightness * 900;
+    filter.frequency.setValueAtTime(hepaticSweep ? baseFrequency * .55 : baseFrequency, time);
+    if (hepaticSweep) filter.frequency.exponentialRampToValueAtTime(baseFrequency * 1.7, time + duration * .72);
+    filter.Q.value = hepaticSweep ? 11 : 8;
     gain.gain.setValueAtTime(0.0001, time);
     gain.gain.linearRampToValueAtTime(0.018, time + 0.18);
     gain.gain.setTargetAtTime(0.0001, time + duration * 0.65, 0.24);
@@ -677,7 +1288,7 @@ export class Music {
     if (!this.ctx || !this.delay) return;
     const now = this.ctx.currentTime;
     this.delay.delayTime.cancelScheduledValues(now);
-    this.delay.delayTime.setTargetAtTime(60 / ARRANGEMENTS[this.scene].bpm * 0.75, now, 0.04);
+    this.delay.delayTime.setTargetAtTime(60 / arrangementFor(this.level, this.scene).bpm * 0.75, now, 0.04);
   }
 
   private noise(): AudioBuffer {

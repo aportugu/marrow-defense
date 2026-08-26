@@ -16,15 +16,18 @@ function entryGame(reducedMotion = false): Game {
     tutorialSeen: false,
   };
   Object.assign(game, {
-    state: createInitialState(1337),
+    state: createInitialState('marrow', 1337),
     settings,
     hasEnteredMenu: false,
     music: {
       restartMenu: vi.fn(),
       unlock: vi.fn(),
       trigger: vi.fn(),
+      previewLevel: vi.fn(),
+      startLevel: vi.fn(),
     },
-    sound: { ensure: vi.fn() },
+    sound: { ensure: vi.fn(), wave: vi.fn() },
+    progress: { cleared: { marrow: false, liver: false }, best: { marrow: null, liver: null } },
     visualTime: 23,
     introStartedAt: 0,
     lastIntroCueId: null,
@@ -54,5 +57,13 @@ describe('menu entry gate', () => {
     game.enterMenu();
     expect(game.music.unlock).toHaveBeenCalledOnce();
     expect(game.music.trigger).not.toHaveBeenCalled();
+  });
+
+  it('allows starting hepatic before marrow is cleared', () => {
+    const game = entryGame();
+    game.begin('liver');
+    expect(game.state.level).toBe('liver');
+    expect(game.state.currency).toBe(220);
+    expect(game.music.startLevel).toHaveBeenCalledWith('liver');
   });
 });

@@ -4,7 +4,7 @@ import { GCSF, METER } from '../game/Balance';
 import { checkEnd, stepMeters } from './MeterSystem';
 
 function fresh() {
-  const s = createInitialState(1);
+  const s = createInitialState('marrow', 1);
   startGame(s);
   return s;
 }

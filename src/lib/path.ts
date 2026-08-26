@@ -1,5 +1,7 @@
-// Fixed, visible enemy path through the marrow + free-placement validation.
-import type { PlacementFailure, Tower, Vec } from '../game/types';
+// Visible enemy path(s) + free-placement validation. Marrow is one winding
+// stream; hepatic is three lanes (portal vein, hepatic artery, biliary branch)
+// that converge on a shared inferior vena cava base.
+import type { LevelId, PlacementFailure, Tower, Vec } from '../game/types';
 import { CANVAS_H, CANVAS_W } from '../game/types';
 import { PLACEMENT } from '../game/Balance';
 
@@ -7,6 +9,19 @@ export interface PathDef {
   points: Vec[];
   cum: number[];
   length: number;
+}
+
+function makePath(points: Vec[]): PathDef {
+  const cum: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+  }
+  return { points, cum, length: cum[cum.length - 1] };
+}
+
+function smoothstep(t: number): number {
+  const c = Math.max(0, Math.min(1, t));
+  return c * c * (3 - 2 * c);
 }
 
 export function buildPath(): PathDef {
@@ -22,14 +37,57 @@ export function buildPath(): PathDef {
       Math.sin(x * 0.0023 + 1.2) * 46;
     points.push({ x, y });
   }
-  const cum: number[] = [0];
-  for (let i = 1; i < points.length; i++) {
-    cum.push(
-      cum[i - 1] +
-        Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y),
-    );
-  }
-  return { points, cum, length: cum[cum.length - 1] };
+  return makePath(points);
+}
+
+interface LiverLane {
+  midY: number;
+  amp: number;
+  secondAmp: number;
+  freq: number;
+  secondFreq: number;
+  phase: number;
+}
+
+function laneY(lane: LiverLane, x: number): number {
+  return (
+    lane.midY +
+    Math.sin(x * lane.freq) * lane.amp +
+    Math.sin(x * lane.secondFreq + lane.phase) * lane.secondAmp
+  );
+}
+
+function buildLiverPaths(): PathDef[] {
+  const step = 16;
+  const start = -50;
+  const end = CANVAS_W + 50;
+  const IVC_X = CANVAS_W + 50;
+  const IVC_Y = CANVAS_H * 0.52;
+  const CONVERGE_X = 1000;
+  const lanes: LiverLane[] = [
+    { midY: CANVAS_H * 0.27, amp: 44, secondAmp: 14, freq: 0.01, secondFreq: 0.0031, phase: 0.6 },
+    { midY: CANVAS_H * 0.51, amp: 44, secondAmp: 14, freq: 0.008, secondFreq: 0.0023, phase: 1.2 },
+    { midY: CANVAS_H * 0.75, amp: 38, secondAmp: 16, freq: 0.006, secondFreq: 0.004, phase: 2.4 },
+  ];
+  return lanes.map((lane) => {
+    const pts: Vec[] = [];
+    for (let x = start; x <= end; x += step) {
+      let y: number;
+      if (x <= CONVERGE_X) {
+        y = laneY(lane, x);
+      } else {
+        const t = smoothstep((x - CONVERGE_X) / (IVC_X - CONVERGE_X));
+        y = laneY(lane, CONVERGE_X) + (IVC_Y - laneY(lane, CONVERGE_X)) * t;
+      }
+      pts.push({ x, y });
+    }
+    return makePath(pts);
+  });
+}
+
+export function buildPaths(level: LevelId): PathDef[] {
+  if (level === 'marrow') return [buildPath()];
+  return buildLiverPaths();
 }
 
 // Position (and implicit heading) at distance `d` along the path.
@@ -72,18 +130,28 @@ export function distToPath(path: PathDef, x: number, y: number): number {
   return best;
 }
 
+// Distance from a point to the nearest of several lane polylines.
+export function distToLanePaths(paths: PathDef[], x: number, y: number): number {
+  let best = Infinity;
+  for (const p of paths) {
+    const d = distToPath(p, x, y);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
 // Whether a unit may be placed at (x, y) given the current towers.
 export function canPlaceAt(
-  path: PathDef,
+  paths: PathDef[],
   towers: Tower[],
   x: number,
   y: number,
 ): boolean {
-  return placementFailure(path, towers, x, y) === null;
+  return placementFailure(paths, towers, x, y) === null;
 }
 
 export function placementFailure(
-  path: PathDef,
+  paths: PathDef[],
   towers: Tower[],
   x: number,
   y: number,
@@ -91,7 +159,7 @@ export function placementFailure(
   const { margin, pathClearance, unitGap } = PLACEMENT;
   if (x < margin || x > CANVAS_W - margin) return 'bounds';
   if (y < margin || y > CANVAS_H - margin) return 'bounds';
-  if (distToPath(path, x, y) < pathClearance) return 'path';
+  if (distToLanePaths(paths, x, y) < pathClearance) return 'path';
   for (const t of towers) {
     if (Math.hypot(t.x - x, t.y - y) < unitGap) return 'overlap';
   }

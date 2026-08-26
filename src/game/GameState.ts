@@ -1,10 +1,10 @@
 // Factory + reset for a fresh deterministic state.
-import type { GameState } from './types';
+import type { GameState, LevelId } from './types';
 import { START } from './Balance';
-import { WAVES } from '../data/waves';
+import { LEVELS, wavesForLevel } from '../data/levels';
 import { mulberry32 } from '../lib/rng';
 
-const enemyCounts = () => ({ standard: 0, proliferative: 0, highBurden: 0, bcmaLow: 0 });
+const enemyCounts = () => ({ standard: 0, proliferative: 0, highBurden: 0, bcmaLow: 0, hepaticCore: 0 });
 
 function freshStats(): GameState['stats'] {
   return {
@@ -39,14 +39,15 @@ function freshAbilities(): GameState['abilities'] {
   };
 }
 
-export function createInitialState(seed: number): GameState {
+export function createInitialState(level: LevelId = 'marrow', seed: number = 1337): GameState {
   return {
     phase: 'menu',
     subPhase: 'planning',
+    level,
     wave: 1,
-    wavesTotal: WAVES.length,
+    wavesTotal: wavesForLevel(level).length,
     countdown: START.countdown,
-    currency: START.currency,
+    currency: LEVELS[level].startCurrency,
     meters: { ...START.meter, hyperinflammation: 0 },
     enemies: [],
     towers: [],
@@ -71,6 +72,11 @@ export function createInitialState(seed: number): GameState {
     anakinraUntil: 0,
     iecHsDexaUntil: 0,
     hyperinflammationTrend: 0,
+    bossEscaped: false,
+    hepaticEventQueue: [],
+    activeHepaticEvent: null,
+    hepaticCue: null,
+    hepaticCueSerial: 0,
   };
 }
 
@@ -79,7 +85,7 @@ export function startGame(s: GameState, tutorialActive = true): void {
   s.subPhase = 'planning';
   s.wave = 1;
   s.countdown = START.countdown;
-  s.currency = START.currency;
+  s.currency = LEVELS[s.level].startCurrency;
   s.meters = { ...START.meter, hyperinflammation: 0 };
   s.enemies = [];
   s.towers = [];
@@ -103,4 +109,9 @@ export function startGame(s: GameState, tutorialActive = true): void {
   s.anakinraUntil = 0;
   s.iecHsDexaUntil = 0;
   s.hyperinflammationTrend = 0;
+  s.bossEscaped = false;
+  s.hepaticEventQueue = [];
+  s.activeHepaticEvent = null;
+  s.hepaticCue = null;
+  s.hepaticCueSerial = 0;
 }

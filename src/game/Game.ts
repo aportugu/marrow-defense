@@ -1,8 +1,9 @@
-// Orchestrator: owns state, path, input, the rAF loop, sound and high score.
+// Orchestrator: owns state, level paths, input, the rAF loop, sound and progress.
 // Calls the pure systems each tick, then renders + syncs the UI.
 import type {
   GameState,
   Vec,
+  LevelId,
   UnitTypeId,
   AbilityId,
   Tower,
@@ -11,7 +12,7 @@ import type {
 import { CANVAS_W, CANVAS_H } from './types';
 import { ABILITY, UNIT } from './Balance';
 import { createInitialState, startGame } from './GameState';
-import { buildPath, placementFailure, type PathDef } from '../lib/path';
+import { buildPaths, placementFailure, type PathDef } from '../lib/path';
 import { stepTowers, stepProjectiles, stepEnemies } from '../systems/CombatSystem';
 import { stepWave, startWave } from '../systems/WaveSystem';
 import { stepMeters, checkEnd } from '../systems/MeterSystem';
@@ -27,7 +28,11 @@ import {
   saveSettings,
   loadHighScore,
   saveHighScore,
+  loadProgress,
+  saveProgress,
+  isBetterResult,
   type Settings,
+  type Progress,
 } from '../lib/storage';
 
 export type MenuKind =
@@ -46,7 +51,8 @@ export interface GameCallbacks {
 
 export class Game {
   state: GameState;
-  path: PathDef;
+  paths: PathDef[];
+  progress: Progress;
   canvas: HTMLCanvasElement;
   sound = new Sound();
   music = new Music();
@@ -72,12 +78,14 @@ export class Game {
   private visualTime = 0;
   private introStartedAt = 0;
   private lastIntroCueId: string | null = null;
+  private lastHepaticCueSerial = 0;
 
   constructor(canvas: HTMLCanvasElement | null = null, cb: GameCallbacks = {}) {
     this.canvas = canvas ?? document.createElement('canvas');
     this.cb = cb;
-    this.path = buildPath();
-    this.state = createInitialState(1337);
+    this.paths = buildPaths('marrow');
+    this.state = createInitialState('marrow', 1337);
+    this.progress = loadProgress();
     this.settings = loadSettings();
     this.sound.applySettings(this.settings);
     this.music.applySettings(this.settings);
@@ -118,7 +126,7 @@ export class Game {
       cursor: this.cursor,
       selectedTower: this.selectedTower,
       buildType: this.buildType,
-      path: this.path,
+      paths: this.paths,
       shake: this.shake,
       time: this.visualTime,
       introTime: this.hasEnteredMenu ? Math.max(0, this.visualTime - this.introStartedAt) : 0,
@@ -138,6 +146,11 @@ export class Game {
         stemCellRecovery: s.stats.time < s.stemCellRecoveryUntil,
         gcsfSupport: s.stats.time < s.gcsfUntil,
         reducedMotion: this.settings.reducedMotion,
+        level: s.level,
+        bossActive: s.enemies.some((enemy) => enemy.alive && enemy.type === 'hepaticCore'),
+        bossDefeated: s.stats.killsByType.hepaticCore > 0,
+        activeHepaticEvent: s.activeHepaticEvent,
+        bossPhase: s.enemies.find((enemy) => enemy.alive && enemy.type === 'hepaticCore')?.bossPhase ?? 0,
       },
     });
   }
@@ -152,6 +165,7 @@ export class Game {
       }
     }
     s.particles = s.particles.filter((p) => p.life > 0);
+    if (s.particles.length > 260) s.particles.splice(0, s.particles.length - 260);
 
     this.shake = Math.max(0, this.shake - dt * 28);
     this.syncMusic(dt);
@@ -165,13 +179,14 @@ export class Game {
     const subPhaseBefore = s.subPhase;
 
     if (s.subPhase === 'wave') {
-      stepEnemies(s, dt, this.path);
+      stepEnemies(s, dt, this.paths);
       stepTowers(s, dt);
       stepProjectiles(s, dt);
     }
     stepAbilities(s, dt);
     stepMeters(s, dt);
-    stepWave(s, dt, this.path);
+    stepWave(s, dt, this.paths);
+    this.syncHepaticCue();
     if (subPhaseBefore === 'planning' && s.subPhase === 'wave') {
       if (s.onboarding.active) {
         s.onboarding.active = false;
@@ -214,8 +229,13 @@ export class Game {
   }
 
   private commitScore(): void {
-    const { score } = computeScore(this.state);
+    const { score, response } = computeScore(this.state);
     this.highScore = saveHighScore(score);
+    const level = this.state.level;
+    if (this.state.phase === 'won') this.progress.cleared[level] = true;
+    const result = { score, response: response.id };
+    if (isBetterResult(result, this.progress.best[level])) this.progress.best[level] = result;
+    this.progress = saveProgress(this.progress);
   }
 
   score(): ScoreResult {
@@ -229,11 +249,12 @@ export class Game {
 
   loseReason(): string {
     const m = this.state.meters;
+    if (this.state.bossEscaped) return 'The hepatic plasmacytoma core escaped containment.';
     if (m.crs >= 100) return 'Severe CRS — a cytokine storm took the T cells down.';
     if (m.neuro >= 100) return 'Irreversible neurotoxicity silenced the nervous system.';
     if (m.hyperinflammation >= 100) return 'IEC-HS hyperinflammation progressed to critical organ stress.';
     if (m.fitness <= 0) return 'The patient lost all fitness — the body gave up.';
-    return 'The marrow was overrun.';
+    return this.state.level === 'liver' ? 'The liver was overrun.' : 'The marrow was overrun.';
   }
 
   // ---- Public input API (called by the UI) ----
@@ -255,8 +276,9 @@ export class Game {
     }
   }
 
-  begin(forceTutorial = false): void {
-    this.state = createInitialState(1337);
+  begin(level: LevelId = 'marrow', forceTutorial = false): void {
+    this.paths = buildPaths(level);
+    this.state = createInitialState(level, 1337);
     startGame(this.state, forceTutorial || !this.settings.tutorialSeen);
     this.selectedTower = null;
     this.buildType = null;
@@ -266,13 +288,16 @@ export class Game {
     this.crsWarned = false;
     this.neuroWarned = false;
     this.iecHsWasActive = false;
+    this.lastHepaticCueSerial = 0;
+    this.music.startLevel(level);
     this.music.unlock();
     this.sound.ensure();
     this.sound.wave();
   }
 
   toMenu(): void {
-    this.state = createInitialState(1337);
+    this.paths = buildPaths('marrow');
+    this.state = createInitialState('marrow', 1337);
     this.state.onboarding.active = false;
     this.state.onboarding.hint = null;
     this.selectedTower = null;
@@ -281,6 +306,7 @@ export class Game {
     this.heat = 0;
     this.lastEscapes = 0;
     this.iecHsWasActive = false;
+    this.lastHepaticCueSerial = 0;
     this.introStartedAt = this.visualTime;
     this.lastIntroCueId = null;
     this.music.restartMenu();
@@ -298,7 +324,7 @@ export class Game {
   tryPlace(x: number, y: number, type: UnitTypeId): PlacementResult {
     const s = this.state;
     if (s.phase !== 'playing') return { ok: false, reason: 'bounds' };
-    const invalid = placementFailure(this.path, s.towers, x, y);
+    const invalid = placementFailure(this.paths, s.towers, x, y);
     if (invalid) return { ok: false, reason: invalid };
     const def = UNIT[type];
     if (s.currency < def.cost) return { ok: false, reason: 'funding' };
@@ -386,6 +412,20 @@ export class Game {
     this.shake = Math.max(this.shake, n);
   }
 
+  private syncHepaticCue(): void {
+    const cue = this.state.hepaticCue;
+    if (!cue || cue.serial === this.lastHepaticCueSerial) return;
+    this.lastHepaticCueSerial = cue.serial;
+    const musicPan = this.state.level === 'liver' ? [-0.6, 0, 0.6][cue.lane] ?? 0 : 0;
+    this.music.trigger(cue.kind, { pan: musicPan });
+    this.sound.hepatic(cue.kind);
+    this.kinetic.pushEvent(cue.kind, this.visualTime);
+    const lane = this.state.level === 'liver' ? ['PORTAL VEIN', 'HEPATIC ARTERY', 'BILIARY BRANCH'][cue.lane] : '';
+    if (cue.kind === 'flareWarn') this.cb.onNotice?.(`PLASMA-CELL SURGE — ${lane}`);
+    const impacts = cue.kind === 'flareImpact' || cue.kind === 'bossPhase2' || cue.kind === 'bossPhase3' || cue.kind === 'shieldBreak';
+    if (impacts) this.punch(cue.kind === 'bossPhase3' ? 11 : 7);
+  }
+
   private syncMusic(dt: number): void {
     const p = this.state.phase;
     const s = this.state;
@@ -427,15 +467,19 @@ export class Game {
       this.neuroWarned = false;
     }
     const waveT = (s.wave - 1) / Math.max(1, s.wavesTotal - 1);
-    const battle = Math.min(1, 0.2 + 0.45 * waveT + 0.3 * (s.meters.crs / 100) + 0.3 * (s.meters.neuro / 100) + 0.25 * (s.meters.hematotoxicity / 100) + 0.45 * this.heat + 0.2 * (this.settings.speed - 1));
+    const bossPhase = s.enemies.find((enemy) => enemy.alive && enemy.type === 'hepaticCore')?.bossPhase ?? 0;
+    const hepaticPressure = s.activeHepaticEvent ? .18 : bossPhase ? bossPhase * .09 : 0;
+    const battle = Math.min(1, 0.2 + 0.45 * waveT + 0.3 * (s.meters.crs / 100) + 0.3 * (s.meters.neuro / 100) + 0.25 * (s.meters.hematotoxicity / 100) + 0.45 * this.heat + 0.2 * (this.settings.speed - 1) + hepaticPressure);
     let scene: MusicScene;
     if (p === 'menu') scene = 'menu';
     else if (p === 'paused') scene = 'paused';
     else if (p === 'won') scene = 'victory';
     else if (p === 'lost') scene = 'loss';
+    else if (s.level === 'liver' && bossPhase > 0) scene = 'boss';
     else if (s.iecHsActive) scene = 'iecHs';
     else scene = s.subPhase === 'wave' ? 'wave' : 'planning';
     this.music.update({
+      level: s.level,
       scene,
       wave: s.wave,
       intensity: p === 'menu' ? 0.5 : battle,
@@ -444,6 +488,8 @@ export class Game {
       hematotoxicity: s.meters.hematotoxicity,
       fitness: s.meters.fitness,
       leakHeat: this.heat,
+      bossPhase,
+      hepaticEventPressure: s.activeHepaticEvent?.stage === 'impact' ? 1 : s.activeHepaticEvent ? .6 : 0,
     });
   }
 
@@ -457,5 +503,9 @@ export class Game {
     this.sound.applySettings(this.settings);
     this.music.applySettings(this.settings);
     document.documentElement.classList.toggle('reduce-motion', this.settings.reducedMotion);
+  }
+
+  previewLevel(level: LevelId): void {
+    this.music.previewLevel(level);
   }
 }

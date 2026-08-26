@@ -7,11 +7,13 @@ import type {
   UnitTypeId,
   AbilityId,
   EnemyTypeId,
+  LevelId,
   Tower,
 } from '../game/types';
 import { CANVAS_W, CANVAS_H } from '../game/types';
 import { UNIT, ABILITY, ENEMY, GCSF, METER } from '../game/Balance';
-import { WAVES, wavePreview } from '../data/waves';
+import { wavePreview } from '../data/waves';
+import { LEVELS, LEVEL_ORDER, wavesForLevel } from '../data/levels';
 import { computeScore } from '../systems/ScoringSystem';
 import { canActivate } from '../systems/AbilitySystem';
 import { computedTowerStats } from '../systems/CombatSystem';
@@ -90,6 +92,7 @@ export class UI {
   };
 
   private lastPhase: string = 'menu';
+  private selectedLevel: LevelId = 'marrow';
   private nav: MenuKind | null = null;
   private lastMenuKey = '';
   private lastBannerKey = '';
@@ -251,9 +254,9 @@ export class UI {
         const result = g.tryPlace(x, y, g.buildType);
         if (result.ok) g.setBuildType(null);
         else this.showNotice({
-          path: 'Too close to the marrow stream',
+          path: g.state.level === 'liver' ? 'Too close to a vascular stream' : 'Too close to the marrow stream',
           overlap: 'Too close to another unit',
-          bounds: 'Build inside the marrow boundary',
+          bounds: 'Build inside the boundary',
           funding: 'Not enough funding',
         }[result.reason]);
         return;
@@ -391,6 +394,15 @@ export class UI {
 
   private sync(s: GameState): void {
     this.updateOrientationGuard(s);
+    const eventDescription = s.activeHepaticEvent
+      ? `, ${s.activeHepaticEvent.stage === 'warning' ? 'incoming' : 'active'} plasma-cell surge in ${LEVELS.liver.lanes[s.activeHepaticEvent.lane].name}`
+      : '';
+    this.canvas.setAttribute(
+      'aria-label',
+      s.level === 'liver'
+        ? `Advanced hepatic plasmacytoma defense battlefield with portal, arterial, and biliary lanes${eventDescription}`
+        : 'Bone marrow defense battlefield',
+    );
     for (const m of METER_META) {
       const v = s.meters[m.id];
       this.meterFill[m.id].setAttribute('stroke-dashoffset', String(GAUGE_C * (1 - v / 100)));
@@ -483,22 +495,30 @@ export class UI {
     this.banner.classList.remove('hidden');
     if (s.subPhase === 'planning' && s.wave <= s.wavesTotal) {
       const secs = Math.max(0, Math.ceil(s.countdown));
-      const key = `p${s.wave}-${secs}-${s.lastWaveReport?.wave ?? 0}-${s.onboarding.hint ?? ''}`;
+      const key = `${s.level}-p${s.wave}-${secs}-${s.lastWaveReport?.wave ?? 0}-${s.onboarding.hint ?? ''}`;
       if (key !== this.lastBannerKey) {
         this.lastBannerKey = key;
-        const prev = wavePreview(WAVES[s.wave - 1]);
+        const prev = wavePreview(wavesForLevel(s.level)[s.wave - 1]);
         const chips = (Object.keys(prev) as EnemyTypeId[])
           .filter((k) => prev[k] > 0)
           .map((k) => `<span class="chip c-${k}">${prev[k]} ${ENEMY[k].icon}</span>`)
           .join('');
+        const waveDef = wavesForLevel(s.level)[s.wave - 1];
+        const behaviors = new Set(waveDef.groups.map((group) => group.behavior).filter(Boolean));
+        const specialChips = s.level === 'liver'
+          ? `${waveDef.events?.length ? '<span class="chip hepatic-threat">SURGE EVENT</span>' : ''}${behaviors.has('mitotic') ? '<span class="chip hepatic-threat">MITOTIC</span>' : ''}${behaviors.has('obstruction') ? '<span class="chip hepatic-threat">OBSTRUCTION</span>' : ''}${s.wave === 10 ? '<span class="chip hepatic-threat">3-PHASE CORE</span>' : ''}`
+          : '';
         const report = s.lastWaveReport
           ? `<div class="wave-report">Wave ${s.lastWaveReport.wave}: ${s.lastWaveReport.kills} cleared · ${s.lastWaveReport.escapes} escaped · +${s.lastWaveReport.fundingEarned} funding · peaks CRS/ICANS/IEC-HS/HEM ${s.lastWaveReport.peakCrs}/${s.lastWaveReport.peakNeuro}/${s.lastWaveReport.peakHyperinflammation}/${s.lastWaveReport.peakHematotoxicity}</div>`
           : '';
-        const title = WAVE_TITLES[s.wave];
-        const hint = s.onboarding.active && s.onboarding.hint === 'placeUnit'
+         const title = WAVE_TITLES[s.level][s.wave];
+         const hint = s.onboarding.active && s.onboarding.hint === 'placeUnit'
           ? '<div class="placement-hint">LEGAL PLACEMENT SPACE HIGHLIGHTED</div>' : '';
-        this.banner.innerHTML = `${report}<div class="b-line">WAVE ${s.wave}${title ? ` · ${title}` : ''} IN <b>${secs}s</b></div>
-          <div class="b-chips">${chips}</div>
+        const briefing = s.level === 'liver' && s.wave === 1
+          ? '<div class="hepatic-briefing"><b>CLEAR INVADING PLASMA-CELL CLUSTERS FROM THE LIVER</b><span>PORTAL VEIN · HEPATIC ARTERY · BILIARY BRANCH</span></div>'
+          : '';
+        this.banner.innerHTML = `${report}${briefing}<div class="b-line">WAVE ${s.wave}${title ? ` · ${title}` : ''} IN <b>${secs}s</b></div>
+          <div class="b-chips">${chips}${specialChips}</div>
           ${hint}
           <button class="btn small${s.onboarding.hint === 'startWave' ? ' hint' : ''}">Start now</button>`;
         this.banner.querySelector<HTMLButtonElement>('.btn.small')!.addEventListener('click', () => {
@@ -506,11 +526,16 @@ export class UI {
         });
       }
     } else {
-      const key = `w${s.wave}`;
+      const event = s.activeHepaticEvent;
+      const eventSeconds = event ? Math.max(0, Math.ceil(event.remaining)) : 0;
+      const key = `${s.level}-w${s.wave}-${event?.id ?? 0}-${event?.stage ?? ''}-${eventSeconds}`;
       if (key !== this.lastBannerKey) {
         this.lastBannerKey = key;
-        const title = WAVE_TITLES[s.wave];
-        this.banner.innerHTML = `<div class="b-line big">WAVE ${Math.min(s.wave, s.wavesTotal)}${title ? ` · ${title}` : ''}</div>`;
+        const title = WAVE_TITLES[s.level][s.wave];
+        const eventLabel = event
+          ? `<div class="hepatic-event ${event.stage}"><b>${event.stage === 'warning' ? 'PLASMA-CELL SURGE' : 'SURGE ACTIVE'} — ${LEVELS.liver.lanes[event.lane].name.toUpperCase()}</b>${event.stage === 'warning' ? `<span>IMPACT IN ${eventSeconds}s</span>` : ''}</div>`
+          : '';
+        this.banner.innerHTML = `${eventLabel}<div class="b-line big">WAVE ${Math.min(s.wave, s.wavesTotal)}${title ? ` · ${title}` : ''}</div>`;
       }
     }
   }
@@ -524,13 +549,16 @@ export class UI {
         g.enterMenu();
         break;
       case 'begin':
+        this.nav = null;
+        g.begin(this.selectedLevel);
+        break;
       case 'restart':
         this.nav = null;
-        g.begin();
+        g.begin(this.game.state.level);
         break;
       case 'tutorial':
         this.nav = null;
-        g.begin(true);
+        g.begin(this.selectedLevel, true);
         break;
       case 'resume':
         g.togglePause();
@@ -589,13 +617,37 @@ export class UI {
       );
       description.id = 'intro-cutscene-description';
       card.setAttribute('aria-describedby', description.id);
+      const levelRow = el('div', 'level-row');
+      for (const id of LEVEL_ORDER) {
+        const def = LEVELS[id];
+        const advanced = id === 'liver';
+        const selected = this.selectedLevel === id;
+        const b = el('button', `level-card level-${id}${advanced ? ' advanced' : ''}${selected ? ' selected' : ''}`);
+        b.setAttribute('aria-pressed', String(selected));
+        b.innerHTML = `<div class="lc-head"><span class="lc-name">${def.name}</span><span class="lc-difficulty">${def.difficulty}</span></div>
+          <div class="lc-tag">${def.tagline}</div>
+          <div class="lc-summary">10 WAVES · ${def.difficultySummary}</div>
+          ${def.recommendedText ? `<div class="lc-recommended">${def.recommendedText}</div>` : ''}
+          <div class="lc-footer"><span class="lc-best">${g.progress.best[id] ? `Best: ${g.progress.best[id]!.response} · ${g.progress.best[id]!.score} pts` : 'Best: —'}</span><span class="lc-state">${selected ? 'SELECTED' : 'SELECT'}</span></div>`;
+        b.addEventListener('click', () => {
+          this.selectedLevel = id;
+          g.previewLevel(id);
+          this.lastMenuKey = '';
+        });
+        levelRow.appendChild(b);
+      }
       card.append(
+        el('p', 'menu-kicker', 'CHOOSE YOUR BATTLEFIELD'),
         el('h1', undefined, 'MARROW DEFENSE'),
-        el('p', 'tag', 'A CAR-T tower defense: route your engineered cells through 10 waves of myeloma while managing the patient\u2019s body.'),
-        el('p', 'hs', `Best score: ${g.highScore}`),
+        el('p', 'tag', 'Defend the patient with engineered CAR-T cells across two distinct plasmacytoma campaigns.'),
+        el('p', 'hs', `RUN HIGH SCORE · ${g.highScore} pts`),
+        levelRow,
         description,
       );
-      addBtn('Start run', 'begin');
+      addBtn(
+        this.selectedLevel === 'liver' ? 'Start Hepatic — Advanced' : 'Start Marrow',
+        'begin',
+      );
       addBtn('Show control hints', 'tutorial', true);
       addBtn('Clinical Glossary', 'howto', true);
       addBtn('Settings', 'settings', true);
@@ -611,33 +663,38 @@ export class UI {
       addBtn('Settings', 'settings', true);
       addBtn('Quit to menu', 'menu', true);
     } else if (kind === 'win' || kind === 'lose') {
+      this.selectedLevel = s.level;
       const r = computeScore(s);
       if (kind === 'win') {
-        card.append(
-          el('h1', undefined, 'MARROW CLEARED'),
-          el('div', `grade g-${r.grade}`, r.grade),
-          el('div', 'score-big', `${r.score} pts`),
-        );
-        const tbl = el('table', 'parts');
-        for (const [k, v] of Object.entries(r.parts)) {
-          if (v <= 0) continue;
-          const tr = el('tr');
-          tr.appendChild(el('td', undefined, SCORE_LABELS[k] ?? k));
-          tr.appendChild(el('td', undefined, String(v)));
-          tbl.appendChild(tr);
-        }
-        card.appendChild(tbl);
-        addBtn('Play again', 'begin');
-        addBtn('Menu', 'menu', true);
+        card.append(el('h1', undefined, `${LEVELS[s.level].name.toUpperCase()} CLEARED`));
       } else {
         card.append(
           el('h1', undefined, 'INFUSION FAILED'),
           el('p', 'reason', g.loseReason()),
-          el('div', 'score-big', `${r.score} pts`),
         );
-        addBtn('Try again', 'begin');
-        addBtn('Menu', 'menu', true);
       }
+      const badge = el('div', `response-badge response-${r.response.style}`, r.response.id);
+      badge.setAttribute('aria-label', `${r.response.id}: ${r.response.fullName}`);
+      card.append(
+        badge,
+        el('div', 'response-name', r.response.fullName),
+        el('p', 'response-description', r.response.description),
+        el('div', 'score-big', `${r.score} pts`),
+      );
+      const tbl = el('table', 'parts');
+      for (const [k, v] of Object.entries(r.parts)) {
+        if (v <= 0) continue;
+        const tr = el('tr');
+        tr.appendChild(el('td', undefined, SCORE_LABELS[k] ?? k));
+        tr.appendChild(el('td', undefined, String(v)));
+        tbl.appendChild(tr);
+      }
+      card.append(
+        tbl,
+        el('p', 'response-disclaimer', 'Simulated gameplay response — not an actual clinical IMWG assessment.'),
+      );
+      addBtn(kind === 'win' ? 'Play again' : 'Try again', 'begin');
+      addBtn('Menu', 'menu', true);
     } else if (kind === 'glossary') {
       card.append(el('h1', undefined, 'CLINICAL GLOSSARY'));
       const list = el('div', 'glossary-list');

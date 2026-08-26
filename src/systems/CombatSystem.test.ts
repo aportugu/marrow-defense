@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Enemy, EnemyTypeId, GameState, Tower, UnitTypeId } from '../game/types';
 import { ENEMY } from '../game/Balance';
 import { createInitialState, startGame } from '../game/GameState';
-import { buildPath } from '../lib/path';
+import { buildPaths } from '../lib/path';
+import { spawnEnemy } from './WaveSystem';
 import {
   applyBuffs,
   computedTowerStats,
@@ -32,13 +33,13 @@ function tower(type: UnitTypeId, x = 100, y = 100, tier: 0 | 1 | 2 = 0): Tower {
   };
 }
 
-function enemy(type: EnemyTypeId, x: number, y: number, id = 1): Enemy {
+function enemy(type: EnemyTypeId, x: number, y: number, id = 1, lane = 0): Enemy {
   const d = ENEMY[type];
-  return { id, type, x, y, pathPos: 0, hp: d.hp, maxHp: d.hp, alive: true };
+  return { id, type, lane, x, y, pathPos: 0, speed: d.speed, reward: d.reward, hp: d.hp, maxHp: d.hp, alive: true };
 }
 
 function fresh(): GameState {
-  const s = createInitialState(1);
+  const s = createInitialState('marrow', 1);
   startGame(s);
   return s;
 }
@@ -159,11 +160,11 @@ describe('combat simulation', () => {
 
   it('enemies that reach the end leak and hit the meters', () => {
     const s = fresh();
-    const path = buildPath();
+    const path = buildPaths('marrow')[0];
     const e = enemy('standard', 0, 0);
     e.pathPos = path.length;
     s.enemies = [e];
-    const leaked = stepEnemies(s, 0.5, path);
+    const leaked = stepEnemies(s, 0.5, [path]);
     expect(leaked).toBe(1);
     expect(e.alive).toBe(false);
     expect(s.stats.escapes).toBe(1);
@@ -171,5 +172,55 @@ describe('combat simulation', () => {
     expect(s.meters.hematotoxicity).toBe(0);
     expect(s.meters.burden).toBeCloseTo(ENEMY.standard.escapeBurden);
     expect(s.meters.fitness).toBe(100);
+  });
+
+  it('splits a mitotic cluster once while conserving remaining HP and reward', () => {
+    const s = createInitialState('liver', 2);
+    startGame(s);
+    const parent = enemy('proliferative', 100, 100);
+    parent.behavior = 'mitotic';
+    s.enemies = [parent];
+    s.projectiles = [{ id: 9, x: 100, y: 100, targetId: parent.id, speed: 480, damage: 12, unit: 'bcma', crsFactor: 1 }];
+    stepProjectiles(s, .01);
+    const daughters = s.enemies.filter((candidate) => candidate.alive);
+    expect(parent.alive).toBe(false);
+    expect(daughters).toHaveLength(2);
+    expect(daughters.reduce((total, daughter) => total + daughter.hp, 0)).toBeCloseTo(10);
+    expect(daughters.reduce((total, daughter) => total + daughter.reward, 0)).toBeCloseTo(parent.reward);
+    expect(daughters.every((daughter) => daughter.behavior == null && daughter.splitDone)).toBe(true);
+    expect(s.hepaticCue?.kind).toBe('division');
+  });
+
+  it('anchors one obstruction and produces exactly three escorts', () => {
+    const s = createInitialState('liver', 3);
+    startGame(s);
+    const liverPaths = buildPaths('liver');
+    const obstruction = enemy('highBurden', 0, 0, 1, 2);
+    obstruction.behavior = 'obstruction';
+    obstruction.pathPos = liverPaths[2].length * .63;
+    s.enemies = [obstruction];
+    stepEnemies(s, 3.2, liverPaths);
+    expect(obstruction.escortsSpawned).toBe(3);
+    stepEnemies(s, 3.2, liverPaths);
+    expect(s.enemies.filter((candidate) => candidate !== obstruction)).toHaveLength(3);
+  });
+
+  it('protects the boss with escorts and advances through both HP phases', () => {
+    const s = createInitialState('liver', 4);
+    startGame(s);
+    spawnEnemy(s, 'hepaticCore', 2, buildPaths('liver'));
+    const boss = s.enemies.find((candidate) => candidate.type === 'hepaticCore')!;
+    s.projectiles = [{ id: 20, x: boss.x, y: boss.y, targetId: boss.id, speed: 480, damage: 100, unit: 'bcma', crsFactor: 1 }];
+    stepProjectiles(s, .01);
+    expect(boss.hp).toBe(1150);
+    for (const escort of s.enemies.filter((candidate) => candidate.behavior === 'bossEscort')) escort.alive = false;
+    s.projectiles = [{ id: 21, x: boss.x, y: boss.y, targetId: boss.id, speed: 480, damage: 400, unit: 'bcma', crsFactor: 1 }];
+    stepProjectiles(s, .01);
+    expect(boss.bossPhase).toBe(2);
+    expect(s.hepaticEventQueue).toHaveLength(2);
+    s.projectiles = [{ id: 22, x: boss.x, y: boss.y, targetId: boss.id, speed: 480, damage: 400, unit: 'bcma', crsFactor: 1 }];
+    stepProjectiles(s, .01);
+    expect(boss.bossPhase).toBe(3);
+    expect(boss.speed).toBeCloseTo(9);
   });
 });

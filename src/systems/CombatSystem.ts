@@ -5,6 +5,26 @@ import type { ComputedTowerStats, GameState, Tower, Enemy, UnitTypeId } from '..
 import { UNIT, ENEMY, METER, DEXA, ECONOMY, IEC_HS } from '../game/Balance';
 import { clamp, dist2 } from '../lib/math';
 import { posAt, type PathDef } from '../lib/path';
+import { LEVELS } from '../data/levels';
+
+function cue(s: GameState, kind: NonNullable<GameState['hepaticCue']>['kind'], lane: number): void {
+  s.hepaticCueSerial++;
+  s.hepaticCue = { serial: s.hepaticCueSerial, kind, lane };
+}
+
+function spawnAtEnemy(s: GameState, source: Enemy, type: Enemy['type'], behavior?: Enemy['behavior']): Enemy {
+  const def = ENEMY[type];
+  const mod = LEVELS[s.level].lanes[source.lane].mods[type];
+  const hp = def.hp * mod.hp * .65;
+  const child: Enemy = {
+    id: s.nextId++, type, lane: source.lane, x: source.x, y: source.y,
+    pathPos: Math.max(0, source.pathPos - 5), hp, maxHp: hp,
+    speed: def.speed * mod.speed, baseSpeed: def.speed * mod.speed,
+    reward: def.reward * mod.reward, alive: true, behavior,
+  };
+  s.enemies.push(child);
+  return child;
+}
 
 export function rangeOf(t: Tower): number {
   let r = UNIT[t.type].range;
@@ -51,7 +71,7 @@ export function supportRadiusOf(t: Tower): number {
 
 export function computedTowerStats(t: Tower, s: GameState): ComputedTowerStats {
   const target = (type: Enemy['type']): Enemy => ({
-    id: -1, type, x: t.x, y: t.y, pathPos: 0, hp: 1, maxHp: 1, alive: true,
+    id: -1, type, x: t.x, y: t.y, pathPos: 0, lane: 0, speed: 0, reward: 0, hp: 1, maxHp: 1, alive: true,
   });
   return {
     range: rangeOf(t),
@@ -85,17 +105,46 @@ export function applyBuffs(s: GameState): void {
   }
 }
 
-export function stepEnemies(s: GameState, dt: number, path: PathDef): number {
+export function stepEnemies(s: GameState, dt: number, paths: PathDef[]): number {
   let escapes = 0;
   for (const e of s.enemies) {
     if (!e.alive) continue;
+    if (e.behavior === 'bossEscort' && e.parentBossId != null) {
+      const boss = s.enemies.find((candidate) => candidate.id === e.parentBossId && candidate.alive);
+      if (!boss) {
+        e.alive = false;
+        continue;
+      }
+      const orbit = (e.id % 3) * Math.PI * 2 / 3 + s.stats.time * 1.8;
+      e.x = boss.x + Math.cos(orbit) * 42;
+      e.y = boss.y + Math.sin(orbit) * 30;
+      e.pathPos = boss.pathPos;
+      continue;
+    }
     const en = ENEMY[e.type];
-    e.pathPos += en.speed * dt;
+    const path = paths[((e.lane % paths.length) + paths.length) % paths.length];
+    if (e.behavior === 'obstruction' && e.pathPos >= path.length * .62 && (e.escortsSpawned ?? 0) < 3) {
+      if (e.obstructionTimer == null) {
+        e.obstructionTimer = 0;
+        e.escortsSpawned = 0;
+        cue(s, 'obstruction', e.lane);
+      }
+      const before = Math.floor(e.obstructionTimer);
+      e.obstructionTimer += dt;
+      const after = Math.min(3, Math.floor(e.obstructionTimer));
+      for (let i = before; i < after; i++) {
+        spawnAtEnemy(s, e, 'standard');
+        e.escortsSpawned = (e.escortsSpawned ?? 0) + 1;
+      }
+    } else {
+      e.pathPos += e.speed * dt;
+    }
     const p = posAt(path, e.pathPos);
     e.x = p.x;
     e.y = p.y;
     if (e.pathPos >= path.length) {
       e.alive = false;
+      if (e.type === 'hepaticCore') s.bossEscaped = true;
       escapes++;
       s.stats.escapes++;
       s.stats.escapesByType[e.type]++;
@@ -114,7 +163,7 @@ function fire(t: Tower, s: GameState): void {
   const dualTier2 = t.type === 'dual' && t.tier >= 2;
   const targets = nearestTargets(t, s.enemies, dualTier2 ? 2 : 1);
   for (const target of targets) {
-  const mult = dualTier2 ? 0.75 : 1;
+    const mult = dualTier2 && targets.length > 1 ? 0.75 : 1;
     s.projectiles.push({
       id: s.nextId++,
       x: t.x,
@@ -155,10 +204,16 @@ export function killEnemy(
   e.alive = false;
   e.hp = 0;
   const en = ENEMY[e.type];
-  s.currency += en.reward;
-  s.stats.fundingEarned += en.reward;
+  s.currency += e.reward;
+  s.stats.fundingEarned += e.reward;
   s.stats.kills++;
   s.stats.killsByType[e.type]++;
+  if (e.behavior === 'bossEscort' && e.parentBossId != null) {
+    const shieldRemaining = s.enemies.some((other) =>
+      other.alive && other.behavior === 'bossEscort' && other.parentBossId === e.parentBossId,
+    );
+    if (!shieldRemaining) cue(s, 'shieldBreak', e.lane);
+  }
   const prevCrs = s.meters.crs;
   const dexaFactor = s.stats.time < s.crsSuppressedUntil ? DEXA.crsMultiplier : 1;
   s.meters.crs = clamp(s.meters.crs + en.crsOnKill * crsFactor * dexaFactor, 0, 100);
@@ -192,6 +247,59 @@ export function killEnemy(
   });
 }
 
+function splitMitoticEnemy(s: GameState, e: Enemy): void {
+  if (!e.alive || e.splitDone || e.behavior !== 'mitotic') return;
+  e.splitDone = true;
+  e.alive = false;
+  const remaining = Math.max(1, e.hp);
+  for (let i = 0; i < 2; i++) {
+    s.enemies.push({
+      ...e,
+      id: s.nextId++,
+      x: e.x + (i ? 7 : -7),
+      y: e.y + (i ? -5 : 5),
+      pathPos: Math.max(0, e.pathPos + (i ? -3 : 3)),
+      hp: remaining / 2,
+      maxHp: e.maxHp / 2,
+      reward: e.reward / 2,
+      alive: true,
+      behavior: undefined,
+      splitDone: true,
+    });
+  }
+  for (let i = 0; i < 10; i++) {
+    const a = Math.PI * 2 * i / 10;
+    s.particles.push({
+      x: e.x, y: e.y, vx: Math.cos(a) * 70, vy: Math.sin(a) * 70,
+      life: .55, maxLife: .55, color: '#f0abfc', size: 3.5, effect: 'division',
+    });
+  }
+  cue(s, 'division', e.lane);
+}
+
+function queueBossSurge(s: GameState, lane: number, delay: number, count: number): void {
+  const id = 10000 + s.hepaticCueSerial * 10 + lane;
+  s.hepaticEventQueue.push({
+    id, kind: 'bossPhase', lane, at: s.waveTimer + delay, count,
+    enemyType: 'proliferative', warned: false, fired: false,
+  });
+}
+
+function updateBossPhase(s: GameState, boss: Enemy): void {
+  const fraction = boss.hp / boss.maxHp;
+  if ((boss.bossPhase ?? 1) === 1 && fraction <= .65) {
+    boss.bossPhase = 2;
+    queueBossSurge(s, 0, 3, 4);
+    queueBossSurge(s, 1, 7, 4);
+    cue(s, 'bossPhase2', boss.lane);
+  }
+  if ((boss.bossPhase ?? 1) < 3 && fraction <= .3) {
+    boss.bossPhase = 3;
+    boss.speed = (boss.baseSpeed ?? boss.speed) * 1.5;
+    cue(s, 'bossPhase3', boss.lane);
+  }
+}
+
 export function stepProjectiles(s: GameState, dt: number): void {
   for (const p of s.projectiles) {
     if (p.dead) continue;
@@ -212,8 +320,13 @@ export function stepProjectiles(s: GameState, dt: number): void {
       } else if (p.unit === 'dual') {
         s.particles.push({ x: target.x, y: target.y, vx: 0, vy: 0, life: 0.3, maxLife: 0.3, color: '#67e8f9', size: ENEMY[target.type].size + 4, effect: 'dual' });
       }
-      target.hp -= p.damage;
+      const shielded = target.type === 'hepaticCore' && s.enemies.some((enemy) =>
+        enemy.alive && enemy.behavior === 'bossEscort' && enemy.parentBossId === target.id,
+      );
+      target.hp -= p.damage * (shielded ? .5 : 1);
       if (target.hp <= 0) killEnemy(s, target, p.unit, p.crsFactor);
+      else if (target.behavior === 'mitotic' && !target.splitDone && target.hp <= target.maxHp * .5) splitMitoticEnemy(s, target);
+      else if (target.type === 'hepaticCore') updateBossPhase(s, target);
     } else {
       p.x += (dx / d) * step;
       p.y += (dy / d) * step;
