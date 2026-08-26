@@ -827,13 +827,22 @@ input:focus-visible {
   .stage {
     grid-area: stage;
     place-self: center;
-    width: min(100%, calc((100dvh - 60px) * 1.7778));
-    max-height: 100%;
-    aspect-ratio: 16 / 9;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    aspect-ratio: auto;
     border-radius: 10px;
   }
 
-  .stage canvas { height: 100%; object-fit: contain; }
+  .stage canvas {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: min(100%, calc((100dvh - 112px) * 1.7778));
+    height: auto;
+    transform: translateX(-50%);
+    object-fit: contain;
+  }
 
   .units,
   .abilities {
@@ -879,19 +888,54 @@ input:focus-visible {
   .ability .a-state { font-size: 8px; }
   .shortcut { display: none; }
 
+  /* Reserve the strip above the 16:9 canvas for status UI. Notifications no
+     longer cover enemies, lanes, or tower placement targets on phones. */
   .banner {
-    top: 5px;
-    max-width: calc(100% - 10px);
-    gap: 5px;
-    padding: 5px 8px;
+    top: 4px;
+    left: 4px;
+    right: min(196px, 42%);
+    min-height: 44px;
+    transform: none;
+    gap: 3px 5px;
+    padding: 3px 6px;
+    flex-wrap: nowrap;
   }
-  .b-line { font-size: 9px; }
-  .b-line.big { font-size: 12px; }
-  .chip { font-size: 8px; padding: 2px 5px; }
-  .wave-report { font-size: 8px; }
+  .banner .hepatic-briefing,
+  .banner .wave-report { display: none; }
+  .b-line { flex: 1 1 auto; font-size: 8px; line-height: 1.15; }
+  .b-line.big { font-size: 10px; letter-spacing: .1em; }
+  .b-chips { gap: 2px; }
+  .chip { padding: 1px 4px; font-size: 7px; white-space: nowrap; }
+  .hepatic-event { gap: 4px; margin: 0; padding: 2px 4px; font-size: 7px; }
+  .banner .btn.small { min-height: 36px; padding: 4px 7px; font-size: 9px; }
 
-  .notice { bottom: 8px; max-width: 88%; font-size: 10px; }
-  .iec-panel { top: 5px; right: 5px; width: min(290px, 54%); }
+  .notice {
+    top: 4px;
+    right: min(196px, 42%);
+    bottom: auto;
+    left: 4px;
+    min-height: 44px;
+    transform: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 7px;
+    font-size: 9px;
+    text-align: center;
+    animation-name: notice-in-mobile;
+  }
+  @keyframes notice-in-mobile {
+    from { opacity: 0; transform: translateY(4px); }
+  }
+  .iec-panel {
+    top: 4px;
+    right: 4px;
+    width: min(188px, 40%);
+    padding: 4px 6px;
+  }
+  .iec-title { font-size: 7px; }
+  .iec-track { height: 3px; margin: 3px 0; }
+  .iec-status { gap: 4px; font-size: 7px; }
 
   .menu { border-radius: 10px; }
   .menu-card { max-height: calc(100dvh - 16px); padding: 12px 18px; }
