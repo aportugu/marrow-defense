@@ -827,22 +827,13 @@ input:focus-visible {
   .stage {
     grid-area: stage;
     place-self: center;
-    width: 100%;
-    height: 100%;
-    max-height: none;
-    aspect-ratio: auto;
+    width: min(100%, calc((100dvh - 60px) * 1.7778));
+    max-height: 100%;
+    aspect-ratio: 16 / 9;
     border-radius: 10px;
   }
 
-  .stage canvas {
-    position: absolute;
-    left: 50%;
-    bottom: 0;
-    width: min(100%, calc((100dvh - 112px) * 1.7778));
-    height: auto;
-    transform: translateX(-50%);
-    object-fit: contain;
-  }
+  .stage canvas { height: 100%; object-fit: contain; }
 
   .units,
   .abilities {
@@ -888,14 +879,17 @@ input:focus-visible {
   .ability .a-state { font-size: 8px; }
   .shortcut { display: none; }
 
-  /* Reserve the strip above the 16:9 canvas for status UI. Notifications no
-     longer cover enemies, lanes, or tower placement targets on phones. */
+  /* On phones, transient status occupies the otherwise quiet center of the
+     top HUD instead of covering lanes or tower placement targets. */
   .banner {
-    top: 4px;
-    left: 4px;
-    right: min(196px, 42%);
+    position: fixed;
+    top: max(4px, env(safe-area-inset-top));
+    left: 58vw;
+    right: auto;
+    z-index: 22;
+    width: min(270px, 32vw);
     min-height: 44px;
-    transform: none;
+    transform: translateX(-50%);
     gap: 3px 5px;
     padding: 3px 6px;
     flex-wrap: nowrap;
@@ -910,12 +904,15 @@ input:focus-visible {
   .banner .btn.small { min-height: 36px; padding: 4px 7px; font-size: 9px; }
 
   .notice {
-    top: 4px;
-    right: min(196px, 42%);
+    position: fixed;
+    top: max(4px, env(safe-area-inset-top));
+    right: auto;
     bottom: auto;
-    left: 4px;
+    left: 58vw;
+    z-index: 24;
+    width: min(270px, 32vw);
     min-height: 44px;
-    transform: none;
+    transform: translateX(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -925,12 +922,16 @@ input:focus-visible {
     animation-name: notice-in-mobile;
   }
   @keyframes notice-in-mobile {
-    from { opacity: 0; transform: translateY(4px); }
+    from { opacity: 0; transform: translate(-50%, 4px); }
   }
   .iec-panel {
-    top: 4px;
-    right: 4px;
-    width: min(188px, 40%);
+    position: fixed;
+    top: max(4px, env(safe-area-inset-top));
+    right: auto;
+    left: 58vw;
+    z-index: 23;
+    width: min(270px, 32vw);
+    transform: translateX(-50%);
     padding: 4px 6px;
   }
   .iec-title { font-size: 7px; }
