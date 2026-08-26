@@ -941,6 +941,7 @@ input:focus-visible {
     aspect-ratio: auto;
     border: 0;
     border-radius: 10px;
+    overflow: hidden;
   }
 
   .opening-menu > .stage canvas {
@@ -948,6 +949,9 @@ input:focus-visible {
     height: 100%;
     object-fit: contain;
     object-position: center center;
+    /* The desktop artwork is composed around the middle-right of its 16:9
+       canvas. Give that focal area its own phone rail beside the menu. */
+    transform: translateX(clamp(72px, 12vw, 104px));
   }
 
   .opening-menu .menu.menu-start:not(.menu-entry) {
@@ -959,7 +963,7 @@ input:focus-visible {
   }
 
   .opening-menu .menu-card.start-card {
-    width: min(430px, 58%);
+    width: min(400px, 52%);
     max-height: calc(100dvh - 20px);
     padding: 10px 14px;
     background: rgba(20, 8, 18, 0.96);
