@@ -587,8 +587,9 @@ export class UI {
     card.tabIndex = -1;
     const actions = el('div', 'menu-actions');
 
-    const addBtn = (label: string, act: string, ghost = false): void => {
+    const addBtn = (label: string, act: string, ghost = false, mobileLabel?: string): void => {
       const b = el('button', `btn${ghost ? ' ghost' : ''}`, label);
+      if (mobileLabel) b.dataset.mobileLabel = mobileLabel;
       b.addEventListener('click', () => this.menuAction(act));
       actions.appendChild(b);
     };
@@ -648,9 +649,9 @@ export class UI {
         this.selectedLevel === 'liver' ? 'Start Hepatic — Advanced' : 'Start Marrow',
         'begin',
       );
-      addBtn('Show control hints', 'tutorial', true);
-      addBtn('Clinical Glossary', 'howto', true);
-      addBtn('Settings', 'settings', true);
+      addBtn('Show control hints', 'tutorial', true, 'Controls');
+      addBtn('Clinical Glossary', 'howto', true, 'Glossary');
+      addBtn('Settings', 'settings', true, 'Settings');
       card.append(
         actions,
         el('p', 'keys', 'Q/W/E build · 1–5 abilities · SPACE start wave · P pause · ESC cancel'),

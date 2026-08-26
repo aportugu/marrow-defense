@@ -1027,8 +1027,58 @@ input:focus-visible {
   .opening-menu .start-card .lc-recommended,
   .opening-menu .start-card .lc-best,
   .opening-menu .start-card .lc-state { font-size: 7px; }
-  .opening-menu .start-card .menu-actions { margin-top: 5px; gap: 5px; }
+  .opening-menu .start-card .menu-actions { align-items: stretch; margin-top: 5px; gap: 5px; }
   .opening-menu .start-card .menu-actions .btn { min-width: min(240px, 100%); }
+  .opening-menu .start-card .menu-actions .btn[data-mobile-label] { font-size: 0; }
+  .opening-menu .start-card .menu-actions .btn[data-mobile-label]::before {
+    content: attr(data-mobile-label);
+    font-size: 10px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 380px) {
+  .opening-menu .menu-card.start-card {
+    max-height: calc(100dvh - 12px);
+    padding: 7px 12px;
+  }
+
+  .opening-menu .start-card h1 {
+    margin-bottom: 3px;
+    font-size: 18px;
+    letter-spacing: .08em;
+    white-space: nowrap;
+  }
+
+  .opening-menu .start-card .menu-kicker { margin-bottom: 2px; font-size: 7px; }
+  .opening-menu .start-card .tag { margin-bottom: 3px; font-size: 8px; line-height: 1.15; }
+  .opening-menu .start-card .hs { margin-bottom: 4px; padding: 1px 6px; font-size: 7px; }
+  .opening-menu .start-card .level-row { gap: 5px; margin-bottom: 3px; }
+  .opening-menu .start-card .level-card { min-height: 86px; gap: 2px; padding: 5px 6px; }
+  .opening-menu .start-card .lc-name { font-size: 12px; }
+  .opening-menu .start-card .lc-difficulty { font-size: 6px; padding: 1px 4px; }
+  .opening-menu .start-card .lc-tag { min-height: 18px; font-size: 7px; line-height: 1.2; }
+  .opening-menu .start-card .lc-summary,
+  .opening-menu .start-card .lc-recommended,
+  .opening-menu .start-card .lc-best,
+  .opening-menu .start-card .lc-state { font-size: 6px; }
+
+  .opening-menu .start-card .menu-actions {
+    margin-top: 3px;
+    gap: 4px;
+  }
+
+  .opening-menu .start-card .menu-actions .btn {
+    min-height: 36px;
+    padding: 4px;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .opening-menu .start-card .menu-actions .btn:first-child {
+    min-height: 38px;
+    font-size: 12px;
+  }
+
 }
 
 @media (orientation: portrait) and (max-width: 500px) {

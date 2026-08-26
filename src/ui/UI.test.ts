@@ -167,6 +167,8 @@ describe('UI', () => {
     expect([...document.querySelectorAll('.level-card')].map((n) => n.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
     expect(document.querySelector('.menu-kicker')?.textContent).toBe('CHOOSE YOUR BATTLEFIELD');
     expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start Marrow')).toBe(true);
+    expect([...document.querySelectorAll<HTMLButtonElement>('.menu-actions [data-mobile-label]')]
+      .map((button) => button.dataset.mobileLabel)).toEqual(['Controls', 'Glossary', 'Settings']);
   });
 
   it('restores the gameplay layout after leaving the opening menu', () => {
