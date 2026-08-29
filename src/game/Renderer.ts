@@ -436,23 +436,27 @@ function drawTower(
   }
 }
 
-// Placement ghost: a translucent unit at the cursor with its range ring,
-// tinted green when the spot is legal, red when it is not.
+// Placement ghost: a translucent unit at the cursor with its range ring. Tint
+// distinguishes a placeable spot (unit color), a preview-only spot you cannot
+// yet afford (amber, faded), and an illegal spot (red) so a green ghost never
+// lies about whether the tap would actually succeed.
 function drawGhost(ctx: CanvasRenderingContext2D, s: GameState, v: View): void {
   if (!v.buildType || !v.cursor) return;
   const def = UNIT[v.buildType];
-  const ok = canPlaceAt(v.paths, s.towers, v.cursor.x, v.cursor.y);
-  const tint = ok ? def.color : '#ff5b5b';
-  const ring = ok ? def.ring : '#ff9b9b';
+  const legal = canPlaceAt(v.paths, s.towers, v.cursor.x, v.cursor.y);
+  const affordable = s.currency >= def.cost;
+  const tint = !legal ? '#ff5b5b' : (affordable ? def.color : '#f59e0b');
+  const ring = !legal ? '#ff9b9b' : (affordable ? def.ring : '#fbbf24');
+  const fade = legal && affordable ? 1 : 0.55;
   const { x, y } = v.cursor;
   ctx.save();
   ctx.translate(x, y);
-  ctx.globalAlpha = 0.13;
+  ctx.globalAlpha = 0.13 * fade;
   ctx.fillStyle = tint;
   ctx.beginPath();
   ctx.arc(0, 0, def.range, 0, Math.PI * 2);
   ctx.fill();
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.55 * fade;
   ctx.strokeStyle = tint;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([6, 6]);
@@ -460,9 +464,9 @@ function drawGhost(ctx: CanvasRenderingContext2D, s: GameState, v: View): void {
   ctx.arc(0, 0, def.range, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.globalAlpha = 0.65;
+  ctx.globalAlpha = 0.65 * fade;
   cellBody(ctx, 13, tint, ring);
-  ctx.globalAlpha = 0.9;
+  ctx.globalAlpha = 0.9 * fade;
   ctx.strokeStyle = ring;
   ctx.lineWidth = 2;
   for (let i = 0; i < 4; i++) {

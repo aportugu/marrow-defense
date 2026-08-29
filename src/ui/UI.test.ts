@@ -419,4 +419,43 @@ describe('UI', () => {
     game.cb.onSync?.(state);
     expect(document.querySelector('.notice')?.classList.contains('hidden')).toBe(true);
   });
+
+  it('keeps an unaffordable build cell selectable for preview', () => {
+    const { game, state } = setup(); // currency 120 < Dual-Target cost 170
+    game.cb.onSync?.(state);
+    const dual = document.querySelector('.u-dual') as HTMLButtonElement;
+    expect(dual.disabled).toBe(false);
+    expect(dual.classList.contains('poor')).toBe(true);
+    dual.click();
+    expect(game.setBuildType).toHaveBeenCalledWith('dual');
+  });
+
+  it('flags only the units you cannot yet afford as poor', () => {
+    const { game, state } = setup();
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.u-bcma')?.classList.contains('poor')).toBe(false);
+    expect(document.querySelector('.u-dual')?.classList.contains('poor')).toBe(true);
+  });
+
+  it('surfaces a reason instead of firing when an ability is unaffordable', () => {
+    const { game, state } = setup();
+    state.currency = 10;
+    game.cb.onSync?.(state);
+    const toci = document.querySelector('.a-toci') as HTMLButtonElement;
+    expect(toci.disabled).toBe(false);
+    expect(toci.classList.contains('poor')).toBe(true);
+    toci.click();
+    expect(game.useAbility).not.toHaveBeenCalled();
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.notice')?.textContent).toBe('Tocilizumab needs 55 funding');
+  });
+
+  it('still fires an affordable ability on tap', () => {
+    const { game, state } = setup(); // currency 120 >= Tocilizumab cost 55
+    game.cb.onSync?.(state);
+    const toci = document.querySelector('.a-toci') as HTMLButtonElement;
+    expect(toci.classList.contains('ready')).toBe(true);
+    toci.click();
+    expect(game.useAbility).toHaveBeenCalledWith('toci');
+  });
 });

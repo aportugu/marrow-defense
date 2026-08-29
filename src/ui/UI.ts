@@ -13,7 +13,7 @@ import type {
 } from '../game/types';
 import { CANVAS_W, CANVAS_H } from '../game/types';
 import { NoticeQueue } from './NoticeQueue';
-import { UNIT, ABILITY, ENEMY, GCSF, METER } from '../game/Balance';
+import { UNIT, ABILITY, ENEMY, GCSF, STEMCELL, METER } from '../game/Balance';
 import { wavePreview } from '../data/waves';
 import { LEVELS, LEVEL_ORDER, wavesForLevel } from '../data/levels';
 import { computeScore } from '../systems/ScoringSystem';
@@ -185,7 +185,7 @@ export class UI {
       const name = el('span', 'a-name');
       name.append(el('span', 'shortcut', `${shortcut} · `), document.createTextNode(def.name));
       a.btn.append(el('span', 'glyph', def.glyph), name, a.state);
-      a.btn.addEventListener('click', () => this.game.useAbility(id));
+      a.btn.addEventListener('click', () => this.onAbilityPress(id));
       abilities.appendChild(a.btn);
     }
 
@@ -399,6 +399,34 @@ export class UI {
     this.notices.push(m, this.noticeTime());
   }
 
+  private onAbilityPress(id: AbilityId): void {
+    const s = this.game.state;
+    if (s.phase !== 'playing') return;
+    if (canActivate(s, id)) { this.game.useAbility(id); return; }
+    const reason = this.abilityBlockReason(s, id);
+    if (reason) this.showNotice({ text: reason, level: 'info' });
+  }
+
+  private abilityBlockReason(s: GameState, id: AbilityId): string | null {
+    const def = ABILITY[id];
+    const st = s.abilities[id];
+    const stemRecovery = s.stats.time < s.stemCellRecoveryUntil;
+    const gcsfSupport = s.stats.time < s.gcsfUntil;
+    if (id === 'anakinra' && !s.iecHsActive) return 'Anakinra is only available during IEC-HS';
+    if (id === 'stemcell') {
+      if (s.meters.hematotoxicity < STEMCELL.minHematotoxicity) return 'No hematologic need for Stem-Cell Boost';
+      if (gcsfSupport) return 'Stem-Cell Boost is paused while G-CSF is active';
+    }
+    if (id === 'gcsf') {
+      if (s.meters.hematotoxicity < GCSF.minHematotoxicity) return `G-CSF needs hematotoxicity ${GCSF.minHematotoxicity}+`;
+      if (stemRecovery || gcsfSupport) return 'G-CSF support already active';
+    }
+    if (def.once && st.used) return `${def.name} already used`;
+    if (st.cooldown > 0) return `${def.name} recharging (${Math.ceil(st.cooldown)}s)`;
+    if (s.currency < def.cost) return `${def.name} needs ${def.cost} funding`;
+    return null;
+  }
+
   private updateNotice(s: GameState, now: number): void {
     if (s.phase !== 'playing') {
       this.notices.reset();
@@ -482,8 +510,10 @@ export class UI {
       const st = s.abilities[id];
       const a = this.abilityEls[id];
       const can = canActivate(s, id);
-      a.btn.disabled = !can;
+      const live = s.phase === 'playing';
+      a.btn.disabled = !live;
       a.btn.classList.toggle('ready', can);
+      a.btn.classList.toggle('poor', live && !can);
       const gcsfRemaining = Math.max(0, s.gcsfUntil - s.stats.time);
       const concerning = (id === 'toci' && s.meters.crs >= METER.crsWarn) ||
         (id === 'dexa' && (s.meters.neuro >= METER.neuroWarn || s.meters.hyperinflammation >= 55)) ||
@@ -512,9 +542,13 @@ export class UI {
     for (const u of UNIT_IDS) {
       const def = UNIT[u];
       const b = this.unitEls[u];
-      b.disabled = s.phase !== 'playing' || s.currency < def.cost;
-      b.classList.toggle('active', this.game.buildType === u);
-      b.classList.toggle('hint', u === 'bcma' && s.onboarding.active && s.onboarding.hint === 'chooseUnit');
+      const selected = this.game.buildType === u;
+      const poor = s.currency < def.cost;
+      b.disabled = s.phase !== 'playing';
+      b.classList.toggle('poor', poor);
+      b.classList.toggle('active', selected && !poor);
+      b.classList.toggle('preview', selected && poor);
+      b.classList.toggle('hint', u === 'bcma' && s.onboarding.active && s.onboarding.hint === 'chooseUnit' && !poor);
     }
 
     this.updateBanner(s);
