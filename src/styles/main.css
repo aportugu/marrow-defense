@@ -247,6 +247,10 @@ input:focus-visible {
   from { opacity: 0; transform: translate(-50%, 8px); }
 }
 
+/* Read-tier accents so a danger alert scans differently from a routine ping. */
+.notice.level-warning { border-color: #f59e0b; color: #fde68a; }
+.notice.level-critical { border-color: #f43f5e; color: #ffe4e6; }
+
 .b-line { font-size: 13px; letter-spacing: 0.1em; }
 .b-line b { color: var(--cyan-soft); }
 .b-line.big { font-size: 16px; font-weight: 800; letter-spacing: 0.18em; color: var(--cyan-soft); }
@@ -903,30 +907,36 @@ input:focus-visible {
   .hepatic-event { gap: 4px; margin: 0; padding: 2px 4px; font-size: 7px; }
   .banner .btn.small { min-height: 36px; padding: 4px 7px; font-size: 9px; }
 
+  /* On phones, transient status sits at the bottom-center of the play column,
+     clear of the top HUD banner and of the side-rail touch controls. It stays
+     click-through so taps on the battlefield are never blocked. */
   .notice {
     position: fixed;
-    top: max(4px, env(safe-area-inset-top));
+    top: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
     right: auto;
-    bottom: auto;
-    left: 58vw;
+    left: 50%;
     z-index: 24;
-    width: min(270px, 32vw);
-    min-height: 44px;
+    width: min(360px, 72vw);
+    min-height: 40px;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 7px;
-    font-size: 9px;
+    padding: 6px 12px;
+    font-size: 11px;
     text-align: center;
+    pointer-events: none;
     animation-name: notice-in-mobile;
   }
+  .notice.level-warning { font-size: 11px; }
+  .notice.level-critical { font-size: 12px; font-weight: 800; letter-spacing: .04em; }
   @keyframes notice-in-mobile {
     from { opacity: 0; transform: translate(-50%, 4px); }
   }
   .iec-panel {
     position: fixed;
-    top: max(4px, env(safe-area-inset-top));
+    top: calc(max(4px, env(safe-area-inset-top)) + 52px);
     right: auto;
     left: 58vw;
     z-index: 23;

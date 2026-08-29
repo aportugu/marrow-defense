@@ -19,6 +19,12 @@ export type EnemyBehavior = 'mitotic' | 'obstruction' | 'bossEscort' | 'surge';
 export type HepaticEventKind = 'surge' | 'bossPhase';
 export type HepaticCueKind = 'flareWarn' | 'flareImpact' | 'division' | 'obstruction' | 'shieldBreak' | 'bossPhase2' | 'bossPhase3';
 
+export type NoticeLevel = 'info' | 'warning' | 'critical';
+export interface NoticeMessage {
+  text: string;
+  level: NoticeLevel;
+}
+
 export interface Enemy {
   id: number;
   type: EnemyTypeId;

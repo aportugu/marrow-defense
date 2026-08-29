@@ -9,8 +9,10 @@ import type {
   EnemyTypeId,
   LevelId,
   Tower,
+  NoticeMessage,
 } from '../game/types';
 import { CANVAS_W, CANVAS_H } from '../game/types';
+import { NoticeQueue } from './NoticeQueue';
 import { UNIT, ABILITY, ENEMY, GCSF, METER } from '../game/Balance';
 import { wavePreview } from '../data/waves';
 import { LEVELS, LEVEL_ORDER, wavesForLevel } from '../data/levels';
@@ -67,6 +69,8 @@ export class UI {
   private menu: HTMLDivElement;
   private popup: HTMLDivElement;
   private notice: HTMLDivElement;
+  private notices = new NoticeQueue();
+  private lastNoticeKey = '';
   private iecPanel: HTMLDivElement;
   private rotateOverlay: HTMLDivElement;
   private portraitQuery: MediaQueryList | null = null;
@@ -161,7 +165,7 @@ export class UI {
     this.stage.appendChild(this.canvas);
     this.banner = el('div', 'banner hidden');
     this.tooltip = el('div', 'tooltip hidden');
-    this.notice = el('div', 'notice hidden');
+    this.notice = el('div', 'notice level-info hidden');
     this.notice.setAttribute('role', 'status');
     this.notice.setAttribute('aria-live', 'polite');
     this.iecPanel = el('div', 'iec-panel hidden');
@@ -254,11 +258,14 @@ export class UI {
         const result = g.tryPlace(x, y, g.buildType);
         if (result.ok) g.setBuildType(null);
         else this.showNotice({
-          path: g.state.level === 'liver' ? 'Too close to a vascular stream' : 'Too close to the marrow stream',
-          overlap: 'Too close to another unit',
-          bounds: 'Build inside the boundary',
-          funding: 'Not enough funding',
-        }[result.reason]);
+          text: {
+            path: g.state.level === 'liver' ? 'Too close to a vascular stream' : 'Too close to the marrow stream',
+            overlap: 'Too close to another unit',
+            bounds: 'Build inside the boundary',
+            funding: 'Not enough funding',
+          }[result.reason],
+          level: 'warning',
+        });
         return;
       }
       const t = this.nearestTower(x, y, 26);
@@ -382,18 +389,47 @@ export class UI {
     });
   }
 
-  private showNotice(message: string): void {
-    this.notice.textContent = message;
-    this.notice.classList.remove('hidden');
-    window.setTimeout(() => {
-      if (this.notice.textContent === message) this.notice.classList.add('hidden');
-    }, 1800);
+  private noticeTime(): number {
+    return typeof performance !== 'undefined' ? performance.now() : Date.now();
+  }
+
+  private showNotice(message: NoticeMessage | string): void {
+    const m: NoticeMessage =
+      typeof message === 'string' ? { text: message, level: 'info' } : message;
+    this.notices.push(m, this.noticeTime());
+  }
+
+  private updateNotice(s: GameState, now: number): void {
+    if (s.phase !== 'playing') {
+      this.notices.reset();
+      if (!this.notice.classList.contains('hidden')) {
+        this.notice.className = 'notice level-info hidden';
+        this.lastNoticeKey = '';
+      }
+      return;
+    }
+    this.notices.advance(now);
+    const cur = this.notices.current();
+    if (!cur) {
+      if (!this.notice.classList.contains('hidden')) {
+        this.notice.className = 'notice level-info hidden';
+        this.lastNoticeKey = '';
+      }
+      return;
+    }
+    const key = `${cur.id}:${cur.text}`;
+    if (key !== this.lastNoticeKey) {
+      this.lastNoticeKey = key;
+      this.notice.textContent = cur.text;
+      this.notice.className = `notice level-${cur.level}`;
+    }
   }
 
   /* ------------------------------------------------ per-frame sync */
 
   private sync(s: GameState): void {
     this.updateOrientationGuard(s);
+    this.updateNotice(s, this.noticeTime());
     const eventDescription = s.activeHepaticEvent
       ? `, ${s.activeHepaticEvent.stage === 'warning' ? 'incoming' : 'active'} plasma-cell surge in ${LEVELS.liver.lanes[s.activeHepaticEvent.lane].name}`
       : '';

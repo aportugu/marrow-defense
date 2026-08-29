@@ -378,4 +378,45 @@ describe('UI', () => {
     game.cb.onSync?.(state);
     expect(document.querySelector('.a-gcsf .a-state')?.textContent).toBe('HEM 20+');
   });
+
+  it('renders a notice as a click-through status toast with a read-tier class', () => {
+    const { game, state } = setup();
+    game.cb.onNotice?.({ text: 'IEC-HS ACTIVE', level: 'critical' });
+    game.cb.onSync?.(state);
+    const notice = document.querySelector('.notice')!;
+    expect(notice.textContent).toBe('IEC-HS ACTIVE');
+    expect(notice.classList.contains('hidden')).toBe(false);
+    expect(notice.classList.contains('level-critical')).toBe(true);
+  });
+
+  it('lets a critical alert preempt a routine info notice', () => {
+    const { game, state } = setup();
+    game.cb.onNotice?.({ text: 'G-CSF is ready', level: 'info' });
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.notice')?.textContent).toBe('G-CSF is ready');
+    game.cb.onNotice?.({ text: 'PLASMA-CELL SURGE — PORTAL VEIN', level: 'critical' });
+    game.cb.onSync?.(state);
+    const notice = document.querySelector('.notice')!;
+    expect(notice.textContent).toBe('PLASMA-CELL SURGE — PORTAL VEIN');
+    expect(notice.classList.contains('level-critical')).toBe(true);
+  });
+
+  it('does not let a routine info notice replace a warning already on screen', () => {
+    const { game, state } = setup();
+    game.cb.onNotice?.({ text: 'CRS is entering the danger zone', level: 'warning' });
+    game.cb.onSync?.(state);
+    game.cb.onNotice?.({ text: 'TOCI is ready', level: 'info' });
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.notice')?.textContent).toBe('CRS is entering the danger zone');
+  });
+
+  it('hides the notice when play is not active', () => {
+    const { game, state } = setup();
+    game.cb.onNotice?.({ text: 'IEC-HS ACTIVE', level: 'critical' });
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.notice')?.classList.contains('hidden')).toBe(false);
+    state.phase = 'lost';
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.notice')?.classList.contains('hidden')).toBe(true);
+  });
 });

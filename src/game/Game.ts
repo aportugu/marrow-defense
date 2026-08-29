@@ -8,6 +8,7 @@ import type {
   AbilityId,
   Tower,
   PlacementResult,
+  NoticeMessage,
 } from './types';
 import { CANVAS_W, CANVAS_H } from './types';
 import { ABILITY, UNIT } from './Balance';
@@ -46,7 +47,7 @@ export type MenuKind =
 
 export interface GameCallbacks {
   onSync?: (s: GameState) => void;
-  onNotice?: (message: string) => void;
+  onNotice?: (message: NoticeMessage) => void;
 }
 
 export class Game {
@@ -199,7 +200,7 @@ export class Game {
       this.kinetic.pushEvent('waveClear', this.visualTime);
       this.music.trigger('waveClear');
       this.sound.clear();
-      this.cb.onNotice?.(`Wave ${s.lastWaveReport?.wave ?? s.wave - 1} cleared`);
+      this.cb.onNotice?.({ text: `Wave ${s.lastWaveReport?.wave ?? s.wave - 1} cleared`, level: 'info' });
     }
 
     if (s.stats.kills > killsBefore) this.sound.kill();
@@ -384,7 +385,7 @@ export class Game {
       this.sound.ability(id);
       this.music.trigger(id);
       this.kinetic.pushEvent(id, this.visualTime);
-      this.cb.onNotice?.(`${ABILITY[id].name} activated`);
+      this.cb.onNotice?.({ text: `${ABILITY[id].name} activated`, level: 'info' });
     }
   }
 
@@ -421,7 +422,7 @@ export class Game {
     this.sound.hepatic(cue.kind);
     this.kinetic.pushEvent(cue.kind, this.visualTime);
     const lane = this.state.level === 'liver' ? ['PORTAL VEIN', 'HEPATIC ARTERY', 'BILIARY BRANCH'][cue.lane] : '';
-    if (cue.kind === 'flareWarn') this.cb.onNotice?.(`PLASMA-CELL SURGE — ${lane}`);
+    if (cue.kind === 'flareWarn') this.cb.onNotice?.({ text: `PLASMA-CELL SURGE — ${lane}`, level: 'critical' });
     const impacts = cue.kind === 'flareImpact' || cue.kind === 'bossPhase2' || cue.kind === 'bossPhase3' || cue.kind === 'shieldBreak';
     if (impacts) this.punch(cue.kind === 'bossPhase3' ? 11 : 7);
   }
@@ -442,7 +443,7 @@ export class Game {
     if (s.iecHsActive && !this.iecHsWasActive) {
       this.music.trigger('iecHsOnset');
       this.kinetic.pushEvent('iecHsOnset', this.visualTime);
-      this.cb.onNotice?.('IEC-HS ACTIVE');
+      this.cb.onNotice?.({ text: 'IEC-HS ACTIVE', level: 'critical' });
     }
     this.iecHsWasActive = s.iecHsActive;
     const dEsc = s.stats.escapes - this.lastEscapes;
@@ -455,14 +456,14 @@ export class Game {
     if (s.meters.crs >= 60 && !this.crsWarned) {
       this.crsWarned = true;
       this.music.trigger('warning');
-      this.cb.onNotice?.('CRS is entering the danger zone');
+      this.cb.onNotice?.({ text: 'CRS is entering the danger zone', level: 'warning' });
     } else if (s.meters.crs < 45) {
       this.crsWarned = false;
     }
     if (s.meters.neuro >= 60 && !this.neuroWarned) {
       this.neuroWarned = true;
       this.music.trigger('warning');
-      this.cb.onNotice?.('Neurotoxicity is entering the danger zone');
+      this.cb.onNotice?.({ text: 'Neurotoxicity is entering the danger zone', level: 'warning' });
     } else if (s.meters.neuro < 45) {
       this.neuroWarned = false;
     }
