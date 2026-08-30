@@ -1,0 +1,98 @@
+import { expect, test, type Page } from '@playwright/test';
+
+const landscapePhones = [
+  { width: 568, height: 320 },
+  { width: 667, height: 375 },
+  { width: 844, height: 390 },
+];
+
+async function openMainMenu(page: Page): Promise<void> {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page.locator('.start-card')).toBeVisible();
+}
+
+for (const viewport of landscapePhones) {
+  test(`landscape phone geometry ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await openMainMenu(page);
+
+    const card = page.locator('.start-card');
+    const cardBox = await card.boundingBox();
+    expect(cardBox).not.toBeNull();
+    expect(cardBox!.x).toBeGreaterThanOrEqual(0);
+    expect(cardBox!.y).toBeGreaterThanOrEqual(0);
+    expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(viewport.width * 0.55 + 1);
+    expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+
+    const actions = page.locator('.start-card .menu-actions .btn');
+    await expect(actions).toHaveCount(4);
+    for (let index = 0; index < 4; index += 1) await expect(actions.nth(index)).toBeInViewport();
+    const secondary = await actions.evaluateAll((buttons) => buttons.slice(1).map((button) => {
+      const rect = button.getBoundingClientRect(); return { width: rect.width, height: rect.height };
+    }));
+    expect(new Set(secondary.map(({ width }) => Math.round(width))).size).toBe(1);
+    expect(new Set(secondary.map(({ height }) => Math.round(height))).size).toBe(1);
+
+    const stage = await page.locator('.opening-menu > .stage').boundingBox();
+    expect(stage).not.toBeNull();
+    expect(stage!.x + stage!.width - (cardBox!.x + cardBox!.width)).toBeGreaterThan(viewport.width * 0.35);
+
+    await page.getByRole('button', { name: 'Start Marrow' }).click();
+    await expect(page.locator('.menu')).toHaveClass(/hidden/);
+    const [gameStage, canvas, units, abilities, hud, banner] = await Promise.all([
+      page.locator('.stage').boundingBox(), page.locator('.stage canvas').boundingBox(),
+      page.locator('.units').boundingBox(), page.locator('.abilities').boundingBox(),
+      page.locator('.hud').boundingBox(), page.locator('.banner').boundingBox(),
+    ]);
+    expect(gameStage && canvas && units && abilities && hud && banner).toBeTruthy();
+    expect(Math.abs(gameStage!.width / gameStage!.height - 16 / 9)).toBeLessThan(0.03);
+    expect(Math.abs(canvas!.width - gameStage!.width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(canvas!.height - gameStage!.height)).toBeLessThanOrEqual(2);
+    expect(units!.x + units!.width).toBeLessThanOrEqual(gameStage!.x + 1);
+    expect(abilities!.x).toBeGreaterThanOrEqual(gameStage!.x + gameStage!.width - 1);
+    expect(banner!.y).toBeGreaterThanOrEqual(hud!.y - 1);
+    expect(banner!.y + banner!.height).toBeLessThanOrEqual(hud!.y + hud!.height + 1);
+
+    await page.evaluate(() => {
+      const notice = document.createElement('div');
+      notice.className = 'notice test-notice';
+      notice.textContent = 'Responsive alert';
+      document.body.appendChild(notice);
+    });
+    const notice = page.locator('.test-notice');
+    const noticeBox = await notice.boundingBox();
+    expect(noticeBox).not.toBeNull();
+    expect(noticeBox!.x).toBeGreaterThanOrEqual(0);
+    expect(noticeBox!.x + noticeBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+    await expect(notice).toHaveCSS('pointer-events', 'none');
+  });
+}
+
+test('portrait phone displays the rotation guard', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const guard = page.locator('.rotate-overlay');
+  await expect(guard).toBeVisible();
+  await expect(guard).toHaveAttribute('aria-hidden', 'false');
+  await expect(guard).toContainText('Rotate to landscape');
+});
+
+test('desktop retains menu and battlefield geometry', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openMainMenu(page);
+  const menu = await page.locator('.start-card').boundingBox();
+  const stage = await page.locator('.opening-menu > .stage').boundingBox();
+  expect(menu && stage).toBeTruthy();
+  expect(menu!.width).toBeGreaterThan(500);
+  expect(stage!.width).toBeGreaterThan(900);
+  await page.getByRole('button', { name: 'Start Marrow' }).click();
+  const gameStage = await page.locator('.stage').boundingBox();
+  const canvas = await page.locator('.stage canvas').boundingBox();
+  expect(gameStage && canvas).toBeTruthy();
+  expect(Math.abs(gameStage!.width / gameStage!.height - 16 / 9)).toBeLessThan(0.03);
+  expect(Math.abs(canvas!.width - gameStage!.width)).toBeLessThanOrEqual(2);
+});
