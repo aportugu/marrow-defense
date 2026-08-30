@@ -9,7 +9,7 @@ export const CANVAS_H = 720;
 export type EnemyTypeId = 'standard' | 'proliferative' | 'highBurden' | 'bcmaLow' | 'hepaticCore';
 export type UnitTypeId = 'bcma' | 'dual' | 'memory';
 export type AbilityId = 'toci' | 'dexa' | 'stemcell' | 'anakinra' | 'gcsf';
-export type HintId = 'chooseUnit' | 'placeUnit' | 'startWave' | 'monitorWave';
+export type HintId = 'chooseUnit' | 'placeUnit' | 'startWave' | 'monitorWave' | 'reinforce';
 
 export type GamePhase = 'menu' | 'playing' | 'paused' | 'won' | 'lost';
 export type SubPhase = 'planning' | 'wave';
@@ -153,7 +153,7 @@ export interface WaveBaseline {
   abilityUses: Record<AbilityId, number>;
 }
 
-export type PlacementFailure = 'path' | 'overlap' | 'bounds' | 'funding';
+export type PlacementFailure = 'path' | 'lane' | 'overlap' | 'bounds' | 'funding';
 export type PlacementResult =
   | { ok: true; tower: Tower }
   | { ok: false; reason: PlacementFailure };

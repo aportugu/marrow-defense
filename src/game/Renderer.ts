@@ -3,9 +3,9 @@
 // pulsing CRS heat overlay. The menu phase shows a kinetic attract background.
 import type { EnemyBehavior, GameState, Tower, Vec, UnitTypeId } from './types';
 import { CANVAS_W, CANVAS_H } from './types';
-import { ENEMY, UNIT, METER } from './Balance';
+import { ENEMY, UNIT, METER, PLACEMENT } from './Balance';
 import { rangeOf } from '../systems/CombatSystem';
-import { canPlaceAt, posAt, type PathDef } from '../lib/path';
+import { canPlaceAt, guidedPlacementFailure, posAt, type PathDef } from '../lib/path';
 import { LEVELS } from '../data/levels';
 import { KineticBackground, type KineticSignals } from './KineticBackground';
 import { IntroCutscene } from './IntroCutscene';
@@ -113,6 +113,39 @@ function drawPath(ctx: CanvasRenderingContext2D, path: PathDef, time: number, co
   for (const p of pts) ctx.lineTo(p.x, p.y);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawGuidedPlacementBand(
+  ctx: CanvasRenderingContext2D,
+  paths: PathDef[],
+  type: UnitTypeId,
+): void {
+  const maxDistance = UNIT[type].range * 0.8;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (const path of paths) {
+    const trace = () => {
+      ctx.beginPath();
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (const point of path.points) ctx.lineTo(point.x, point.y);
+    };
+    trace();
+    ctx.strokeStyle = 'rgba(57,217,138,0.10)';
+    ctx.lineWidth = maxDistance * 2;
+    ctx.stroke();
+    trace();
+    ctx.strokeStyle = 'rgba(248,113,113,0.12)';
+    ctx.lineWidth = PLACEMENT.pathClearance * 2;
+    ctx.stroke();
+    ctx.setLineDash([8, 10]);
+    trace();
+    ctx.strokeStyle = 'rgba(134,239,172,0.7)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ctx.restore();
 }
 
@@ -443,7 +476,11 @@ function drawTower(
 function drawGhost(ctx: CanvasRenderingContext2D, s: GameState, v: View): void {
   if (!v.buildType || !v.cursor) return;
   const def = UNIT[v.buildType];
-  const legal = canPlaceAt(v.paths, s.towers, v.cursor.x, v.cursor.y);
+  const guidedConstruction = s.onboarding.active
+    && (s.onboarding.hint === 'placeUnit' || s.onboarding.hint === 'reinforce');
+  const legal = guidedConstruction
+    ? guidedPlacementFailure(v.paths, s.towers, v.buildType, v.cursor.x, v.cursor.y) === null
+    : canPlaceAt(v.paths, s.towers, v.cursor.x, v.cursor.y);
   const affordable = s.currency >= def.cost;
   const tint = !legal ? '#ff5b5b' : (affordable ? def.color : '#f59e0b');
   const ring = !legal ? '#ff9b9b' : (affordable ? def.ring : '#fbbf24');
@@ -533,19 +570,13 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState, v: View): vo
     v.kinetic.render(ctx, v.time, v.paths, v.kineticSignals);
     const laneColors = LEVELS[s.level].lanes.map((lane) => lane.color);
     if (s.level === 'liver') drawHepaticEventLayer(ctx, s, v.paths, time, v.kineticSignals.reducedMotion);
+    const guidedConstruction = s.onboarding.active
+      && (s.onboarding.hint === 'placeUnit' || s.onboarding.hint === 'reinforce');
+    if (guidedConstruction && v.buildType) drawGuidedPlacementBand(ctx, v.paths, v.buildType);
     for (let i = 0; i < v.paths.length; i++) {
       drawPath(ctx, v.paths[i], time, laneColors[i % laneColors.length]);
     }
     if (s.level === 'liver') drawHepaticLabels(ctx, v.paths);
-    if (s.onboarding.active && s.onboarding.hint === 'placeUnit') {
-      ctx.fillStyle = 'rgba(57,217,138,0.045)';
-      ctx.fillRect(18, 18, CANVAS_W - 36, CANVAS_H - 36);
-      ctx.strokeStyle = 'rgba(134,239,172,0.45)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 10]);
-      ctx.strokeRect(20, 20, CANVAS_W - 40, CANVAS_H - 40);
-      ctx.setLineDash([]);
-    }
     for (const t of s.towers) drawTower(ctx, t, v.selectedTower === t.id, time, s.stats.time < s.dexaUntil, s.subPhase === 'planning', v.kineticSignals.reducedMotion);
     for (const e of s.enemies) {
       if (!e.alive || e.behavior !== 'bossEscort' || e.parentBossId == null) continue;

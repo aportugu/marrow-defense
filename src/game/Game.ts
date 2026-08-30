@@ -13,7 +13,7 @@ import type {
 import { CANVAS_W, CANVAS_H } from './types';
 import { ABILITY, UNIT } from './Balance';
 import { createInitialState, startGame } from './GameState';
-import { buildPaths, placementFailure, type PathDef } from '../lib/path';
+import { buildPaths, guidedPlacementFailure, placementFailure, type PathDef } from '../lib/path';
 import { stepTowers, stepProjectiles, stepEnemies } from '../systems/CombatSystem';
 import { stepWave, startWave } from '../systems/WaveSystem';
 import { stepMeters, checkEnd } from '../systems/MeterSystem';
@@ -196,10 +196,9 @@ export class Game {
       this.music.trigger('waveStart');
     } else if (subPhaseBefore === 'wave' && s.subPhase === 'planning') {
       if (s.onboarding.active) {
-        s.onboarding.active = false;
-        s.onboarding.hint = null;
-        this.markTutorialSeen();
-        this.cb.onNotice?.({ text: 'Guided wave complete — keep adapting your defense', level: 'info' });
+        s.onboarding.hint = 'reinforce';
+        this.buildType = null;
+        this.cb.onNotice?.({ text: 'Wave cleared — construct another cell near a lane', level: 'info' });
       }
       this.kinetic.pushEvent('waveClear', this.visualTime);
       this.music.trigger('waveClear');
@@ -329,7 +328,11 @@ export class Game {
   tryPlace(x: number, y: number, type: UnitTypeId): PlacementResult {
     const s = this.state;
     if (s.phase !== 'playing') return { ok: false, reason: 'bounds' };
-    const invalid = placementFailure(this.paths, s.towers, x, y);
+    const guidedConstruction = s.onboarding.active
+      && (s.onboarding.hint === 'placeUnit' || s.onboarding.hint === 'reinforce');
+    const invalid = guidedConstruction
+      ? guidedPlacementFailure(this.paths, s.towers, type, x, y)
+      : placementFailure(this.paths, s.towers, x, y);
     if (invalid) return { ok: false, reason: invalid };
     const def = UNIT[type];
     if (s.currency < def.cost) return { ok: false, reason: 'funding' };
@@ -347,7 +350,14 @@ export class Game {
       buffPower: 0,
     };
     s.towers.push(t);
-    if (s.onboarding.active && s.onboarding.hint === 'placeUnit') s.onboarding.hint = 'startWave';
+    if (s.onboarding.active && s.onboarding.hint === 'placeUnit') {
+      s.onboarding.hint = 'startWave';
+    } else if (s.onboarding.active && s.onboarding.hint === 'reinforce') {
+      s.onboarding.active = false;
+      s.onboarding.hint = null;
+      this.markTutorialSeen();
+      this.cb.onNotice?.({ text: 'Guided run complete — wave 2 is ready', level: 'info' });
+    }
     this.sound.place();
     this.punch(3);
     return { ok: true, tower: t };
@@ -397,6 +407,7 @@ export class Game {
     const s = this.state;
     if (s.phase !== 'playing' || s.subPhase !== 'planning' || s.wave > s.wavesTotal)
       return;
+    if (s.onboarding.active && s.onboarding.hint !== 'startWave') return;
     startWave(s);
     if (s.onboarding.active) {
       s.onboarding.hint = 'monitorWave';

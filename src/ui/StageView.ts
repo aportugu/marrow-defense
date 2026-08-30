@@ -56,7 +56,7 @@ export class StageView {
       if (game.buildType) {
         const result = game.tryPlace(x, y, game.buildType);
         if (result.ok) game.setBuildType(null);
-        else this.showNotice({ text: { path: game.state.level === 'liver' ? 'Too close to a vascular stream' : 'Too close to the marrow stream', overlap: 'Too close to another unit', bounds: 'Build inside the boundary', funding: 'Not enough funding' }[result.reason], level: 'warning' });
+        else this.showNotice({ text: { path: game.state.level === 'liver' ? 'Too close to a vascular stream' : 'Too close to the marrow stream', lane: 'Place this cell closer to a lane so enemies enter its firing range.', overlap: 'Too close to another unit', bounds: 'Build inside the boundary', funding: 'Not enough funding' }[result.reason], level: 'warning' });
         return;
       }
       const tower = this.nearestTower(x, y, 26);
@@ -106,10 +106,11 @@ export class StageView {
   private guidedHint(state: GameState): string {
     if (!state.onboarding.active || !state.onboarding.hint) return '';
     const hints = {
-      chooseUnit: ['1/4 · CHOOSE A UNIT', 'Select an affordable defender from the unit rail.', 'Choose a unit'],
-      placeUnit: ['2/4 · PLACE IT', 'Tap a highlighted legal space away from paths and other units.', 'Place in the highlighted area'],
-      startWave: ['3/4 · START THE WAVE', 'Review the incoming cells, then launch the wave when ready.', 'Start the wave'],
-      monitorWave: ['4/4 · MONITOR AND TREAT', 'Units fire automatically. Use Tocilizumab for CRS, Dexamethasone for neurotoxicity, and marrow support for hematotoxicity.', 'Watch meters and match treatment'],
+      chooseUnit: ['1/5 · CHOOSE A UNIT', 'Select an affordable defender from the unit rail.', 'Choose a unit'],
+      placeUnit: ['2/5 · PLACE NEAR A LANE', 'Place inside the green band so enemies enter the cell’s firing range.', 'Place in the green lane band'],
+      startWave: ['3/5 · START THE WAVE', 'Review the incoming cells, then launch the wave when ready.', 'Start the wave'],
+      monitorWave: ['4/5 · MONITOR AND TREAT', 'Units fire automatically. Use Tocilizumab for CRS, Dexamethasone for neurotoxicity, and marrow support for hematotoxicity.', 'Watch meters and match treatment'],
+      reinforce: ['5/5 · REINFORCE', 'Reinvest your funding—construct another cell near a lane before wave 2.', 'Build another cell near a lane'],
     } as const;
     const [title, detail, mobile] = hints[state.onboarding.hint];
     return `<div class="guided-hint"><b>${title}</b><span class="guided-detail">${detail}</span><span class="guided-mobile">${mobile}</span></div>`;
@@ -131,9 +132,12 @@ export class StageView {
       const special = state.level === 'liver' ? `${wave.events?.length ? '<span class="chip hepatic-threat">SURGE EVENT</span>' : ''}${behaviors.has('mitotic') ? '<span class="chip hepatic-threat">MITOTIC</span>' : ''}${behaviors.has('obstruction') ? '<span class="chip hepatic-threat">OBSTRUCTION</span>' : ''}${state.wave === 10 ? '<span class="chip hepatic-threat">3-PHASE CORE</span>' : ''}` : '';
       const report = state.lastWaveReport ? `<div class="wave-report">Wave ${state.lastWaveReport.wave}: ${state.lastWaveReport.kills} cleared · ${state.lastWaveReport.escapes} escaped · +${state.lastWaveReport.fundingEarned} funding · peaks CRS/ICANS/IEC-HS/HEM ${state.lastWaveReport.peakCrs}/${state.lastWaveReport.peakNeuro}/${state.lastWaveReport.peakHyperinflammation}/${state.lastWaveReport.peakHematotoxicity}</div>` : '';
       const title = WAVE_TITLES[state.level][state.wave];
-      const hint = state.onboarding.active && state.onboarding.hint === 'placeUnit' ? '<div class="placement-hint">LEGAL PLACEMENT SPACE HIGHLIGHTED</div>' : '';
+      const guidedConstruction = state.onboarding.active && (state.onboarding.hint === 'chooseUnit' || state.onboarding.hint === 'placeUnit' || state.onboarding.hint === 'reinforce');
+      const placing = state.onboarding.hint === 'placeUnit' || state.onboarding.hint === 'reinforce';
+      const hint = placing ? '<div class="placement-hint">GREEN BAND = EFFECTIVE PLACEMENT RANGE</div>' : '';
       const briefing = state.level === 'liver' && state.wave === 1 ? '<div class="hepatic-briefing"><b>CLEAR INVADING PLASMA-CELL CLUSTERS FROM THE LIVER</b><span>PORTAL VEIN · HEPATIC ARTERY · BILIARY BRANCH</span></div>' : '';
-      this.banner.innerHTML = `${guidedHint}${report}${briefing}<div class="b-line">WAVE ${state.wave}${title ? ` · ${title}` : ''} IN <b>${seconds}s</b></div><div class="b-chips">${chips}${special}</div>${hint}<button class="btn small${state.onboarding.hint === 'startWave' ? ' hint' : ''}">Start now</button>`;
+      const timing = guidedConstruction ? '<b>WAITING FOR CONSTRUCTION</b>' : `IN <b>${seconds}s</b>`;
+      this.banner.innerHTML = `${guidedHint}${report}${briefing}<div class="b-line">WAVE ${state.wave}${title ? ` · ${title}` : ''} ${timing}</div><div class="b-chips">${chips}${special}</div>${hint}<button class="btn small${state.onboarding.hint === 'startWave' ? ' hint' : ''}"${guidedConstruction ? ' disabled' : ''}>${guidedConstruction ? 'Build to continue' : 'Start now'}</button>`;
       this.banner.querySelector<HTMLButtonElement>('.btn.small')!.addEventListener('click', () => this.game.startWaveNow());
       return;
     }

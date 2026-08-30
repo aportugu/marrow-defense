@@ -1,9 +1,9 @@
 // Visible enemy path(s) + free-placement validation. Marrow is one winding
 // stream; hepatic is three lanes (portal vein, hepatic artery, biliary branch)
 // that converge on a shared inferior vena cava base.
-import type { LevelId, PlacementFailure, Tower, Vec } from '../game/types';
+import type { LevelId, PlacementFailure, Tower, UnitTypeId, Vec } from '../game/types';
 import { CANVAS_H, CANVAS_W } from '../game/types';
-import { PLACEMENT } from '../game/Balance';
+import { PLACEMENT, UNIT } from '../game/Balance';
 
 export interface PathDef {
   points: Vec[];
@@ -163,5 +163,20 @@ export function placementFailure(
   for (const t of towers) {
     if (Math.hypot(t.x - x, t.y - y) < unitGap) return 'overlap';
   }
+  return null;
+}
+
+// Guided placements must be close enough to a lane to put the selected cell's
+// firing range to immediate use. Normal play intentionally remains unrestricted.
+export function guidedPlacementFailure(
+  paths: PathDef[],
+  towers: Tower[],
+  type: UnitTypeId,
+  x: number,
+  y: number,
+): Exclude<PlacementFailure, 'funding'> | null {
+  const invalid = placementFailure(paths, towers, x, y);
+  if (invalid) return invalid;
+  if (distToLanePaths(paths, x, y) > UNIT[type].range * 0.8) return 'lane';
   return null;
 }

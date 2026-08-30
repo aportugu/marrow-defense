@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPaths, canPlaceAt, distToLanePaths, distToPath, placementFailure, posAt } from './path';
+import { buildPaths, canPlaceAt, distToLanePaths, distToPath, guidedPlacementFailure, placementFailure, posAt } from './path';
 
 describe('path', () => {
   const [p] = buildPaths('marrow');
@@ -75,6 +75,22 @@ describe('path', () => {
     expect(placementFailure(marrow, [], onPath.x, onPath.y)).toBe('path');
   });
 
+  it('requires guided cells to be close enough to a lane without changing normal placement', () => {
+    let near: { x: number; y: number } | null = null;
+    let far: { x: number; y: number } | null = null;
+    for (let y = 40; y <= 680; y += 10) for (let x = 40; x <= 1240; x += 10) {
+      if (placementFailure(marrow, [], x, y)) continue;
+      const distance = distToLanePaths(marrow, x, y);
+      if (!near && distance >= 48 && distance <= 100) near = { x, y };
+      if (!far && distance > 104) far = { x, y };
+    }
+    expect(near).not.toBeNull();
+    expect(far).not.toBeNull();
+    expect(guidedPlacementFailure(marrow, [], 'bcma', near!.x, near!.y)).toBeNull();
+    expect(guidedPlacementFailure(marrow, [], 'bcma', far!.x, far!.y)).toBe('lane');
+    expect(placementFailure(marrow, [], far!.x, far!.y)).toBeNull();
+  });
+
   it('builds three converging lanes for the liver level', () => {
     const liver = buildPaths('liver');
     expect(liver.length).toBe(3);
@@ -92,5 +108,25 @@ describe('path', () => {
     const onArtery = posAt(artery, 200);
     expect(distToLanePaths(liver, onArtery.x, onArtery.y)).toBeLessThan(1);
     expect(distToLanePaths(liver, onArtery.x, onArtery.y)).toBeLessThanOrEqual(distToPath(portal, onArtery.x, onArtery.y) + 1e-6);
+  });
+
+  it('accepts guided placement alongside each hepatic lane', () => {
+    const liver = buildPaths('liver');
+    for (const target of liver) {
+      let valid = false;
+      for (let d = 100; d < target.length - 100 && !valid; d += 25) {
+        const point = posAt(target, d);
+        for (let radius = 50; radius <= 90 && !valid; radius += 5) {
+          for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 12) {
+            const x = point.x + Math.cos(angle) * radius;
+            const y = point.y + Math.sin(angle) * radius;
+            const nearest = Math.min(...liver.map((lane) => distToPath(lane, x, y)));
+            if (Math.abs(distToPath(target, x, y) - nearest) > 1e-6) continue;
+            if (guidedPlacementFailure(liver, [], 'memory', x, y) === null) { valid = true; break; }
+          }
+        }
+      }
+      expect(valid).toBe(true);
+    }
   });
 });

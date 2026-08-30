@@ -160,7 +160,9 @@ export class HudControlsView {
       const selected = this.game.buildType === id; const poor = state.currency < def.cost;
       button.disabled = state.phase !== 'playing'; button.classList.toggle('poor', poor);
       button.classList.toggle('active', selected && !poor); button.classList.toggle('preview', selected && poor);
-      button.classList.toggle('hint', id === 'bcma' && state.onboarding.active && state.onboarding.hint === 'chooseUnit' && !poor);
+      const guidedChoice = state.onboarding.active
+        && ((state.onboarding.hint === 'chooseUnit' && id === 'bcma') || state.onboarding.hint === 'reinforce');
+      button.classList.toggle('hint', guidedChoice && !poor);
     }
   }
 }

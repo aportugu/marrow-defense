@@ -19,7 +19,8 @@ export const TUTORIAL_PAGES: readonly TutorialPage[] = [
     items: [
       { heading: 'Plan', text: 'Spend funding to place CAR-T units in legal spaces away from paths and other units. Select a placed unit to buy upgrades.' },
       { heading: 'Defend', text: 'Start each wave when ready. Your units attack automatically while surviving cells move toward the patient.' },
-      { heading: 'Adapt', text: 'Kills earn funding. Watch the toxicity meters, match support abilities to the problem, and prepare for the next wave.' },
+      { heading: 'Expand', text: 'Kills and wave clears earn funding. Reinvest it in additional cells to broaden lane coverage as pressure increases.' },
+      { heading: 'Adapt', text: 'Build multiple cells, but keep enough funding in reserve to match support abilities to rising toxicity.' },
     ],
   },
   {
@@ -29,7 +30,7 @@ export const TUTORIAL_PAGES: readonly TutorialPage[] = [
       { heading: `${UNIT.bcma.label} · 100`, text: UNIT.bcma.blurb },
       { heading: `${UNIT.dual.label} · 170`, text: UNIT.dual.blurb },
       { heading: `${UNIT.memory.label} · 75`, text: UNIT.memory.blurb },
-      { heading: 'Upgrades', text: 'Select a placed unit to improve it. Balance immediate coverage against saving funding for treatment abilities.' },
+      { heading: 'Expansion and upgrades', text: 'Add cells near lanes to expand coverage, then select placed units to improve them. Keep a treatment reserve instead of spending every point on defense.' },
     ],
   },
   {

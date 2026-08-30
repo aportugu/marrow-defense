@@ -135,6 +135,7 @@ describe('WaveSystem', () => {
 
   it('planning countdown auto-starts the next wave', () => {
     const s = fresh();
+    s.onboarding = { active: false, hint: null };
     s.countdown = 0.5;
     stepWave(s, 1, paths);
     expect(s.subPhase).toBe('wave');
@@ -142,6 +143,18 @@ describe('WaveSystem', () => {
     expect(s.subPhase).toBe('planning');
     expect(s.wave).toBe(2);
   });
+
+  it.each(['chooseUnit', 'placeUnit', 'reinforce'] as const)(
+    'holds the guided planning countdown during %s',
+    (hint) => {
+      const s = fresh();
+      s.onboarding = { active: true, hint };
+      const before = s.countdown;
+      stepWave(s, 30, paths);
+      expect(s.countdown).toBe(before);
+      expect(s.subPhase).toBe('planning');
+    },
+  );
 
   it('starts the guaranteed IEC-HS episode on wave nine from prior risk', () => {
     const s = fresh();

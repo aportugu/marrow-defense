@@ -82,6 +82,19 @@ describe('UI', () => {
     expect(game.tryPlace).toHaveBeenCalledWith(640, 360, 'bcma');
   });
 
+  it('explains when a guided cell is too far from a lane', () => {
+    const { game } = setup();
+    game.buildType = 'bcma';
+    vi.mocked(game.tryPlace).mockReturnValue({ ok: false, reason: 'lane' });
+    vi.spyOn(game.canvas, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 1280, bottom: 720,
+      width: 1280, height: 720, toJSON: () => ({}),
+    });
+    game.canvas.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 900, clientY: 100 }));
+    game.cb.onSync?.(game.state);
+    expect(document.querySelector('.notice')?.textContent).toContain('closer to a lane');
+  });
+
   it('selects a tower with a pointer tap', () => {
     const { game, state } = setup();
     state.towers = [{
@@ -421,30 +434,41 @@ describe('UI', () => {
     expect(document.querySelector('.menu:not(.hidden)')).toBeNull();
   });
 
-  it('provides four contextual guided-run steps and treatment highlights', () => {
+  it('provides five contextual guided-run steps and treatment highlights', () => {
     const { game, state } = setup();
     state.onboarding = { active: true, hint: 'chooseUnit' };
     game.cb.onSync?.(state);
-    expect(document.querySelector('.guided-hint')?.textContent).toContain('1/4 · CHOOSE A UNIT');
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('1/5 · CHOOSE A UNIT');
 
     state.onboarding.hint = 'placeUnit';
     game.cb.onSync?.(state);
-    expect(document.querySelector('.guided-hint')?.textContent).toContain('2/4 · PLACE IT');
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('2/5 · PLACE NEAR A LANE');
 
     state.onboarding.hint = 'startWave';
     game.cb.onSync?.(state);
-    expect(document.querySelector('.guided-hint')?.textContent).toContain('3/4 · START THE WAVE');
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('3/5 · START THE WAVE');
 
     state.subPhase = 'wave';
     state.onboarding.hint = 'monitorWave';
     state.meters.crs = 10;
     state.meters.neuro = 8;
     game.cb.onSync?.(state);
-    expect(document.querySelector('.guided-hint')?.textContent).toContain('4/4 · MONITOR AND TREAT');
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('4/5 · MONITOR AND TREAT');
     expect(document.querySelector('.guided-hint')?.textContent).toContain('Tocilizumab for CRS');
     expect(document.querySelector('.guided-hint')?.textContent).toContain('Dexamethasone for neurotoxicity');
     expect(document.querySelector('.a-toci')?.classList.contains('hint')).toBe(true);
     expect(document.querySelector('.a-dexa')?.classList.contains('hint')).toBe(true);
+
+    state.subPhase = 'planning';
+    state.wave = 2;
+    state.currency = 120;
+    state.onboarding.hint = 'reinforce';
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('5/5 · REINFORCE');
+    expect(document.querySelector('.u-bcma')?.classList.contains('hint')).toBe(true);
+    expect(document.querySelector('.u-memory')?.classList.contains('hint')).toBe(true);
+    expect(document.querySelector('.u-dual')?.classList.contains('hint')).toBe(false);
+    expect(document.querySelector<HTMLButtonElement>('.banner .btn.small')?.disabled).toBe(true);
   });
 
   it('shows hematotoxicity direction, ICAHT pressure, and Stem-Cell recovery status', () => {

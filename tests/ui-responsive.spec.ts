@@ -70,7 +70,7 @@ for (const viewport of landscapePhones) {
     await expect(guidedStart).toBeInViewport();
     await guidedStart.click();
     await expect(page.locator('.menu')).toHaveClass(/hidden/);
-    await expect(page.locator('.guided-hint')).toContainText('1/4 · CHOOSE A UNIT');
+    await expect(page.locator('.guided-hint')).toContainText('1/5 · CHOOSE A UNIT');
     const [gameStage, canvas, units, abilities, hud, banner] = await Promise.all([
       page.locator('.stage').boundingBox(), page.locator('.stage canvas').boundingBox(),
       page.locator('.units').boundingBox(), page.locator('.abilities').boundingBox(),
@@ -108,6 +108,47 @@ test('portrait phone displays the rotation guard', async ({ page }) => {
   await expect(guard).toBeVisible();
   await expect(guard).toHaveAttribute('aria-hidden', 'false');
   await expect(guard).toContainText('Rotate to landscape');
+});
+
+test('guided reinforcement pauses wave 2 in the iPhone top HUD', async ({ page }) => {
+  test.setTimeout(50_000);
+  const viewport = { width: 844, height: 390 };
+  await page.setViewportSize(viewport);
+  await openMainMenu(page);
+  await page.getByRole('button', { name: 'Tutorial', exact: true }).click();
+  for (let pageIndex = 0; pageIndex < 3; pageIndex += 1) {
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+  }
+  await page.getByRole('button', { name: 'Start Guided Marrow Run' }).click();
+
+  const canvas = page.locator('.stage canvas');
+  const canvasPoint = async (x: number, y: number) => {
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.click(box!.x + x / 1280 * box!.width, box!.y + y / 720 * box!.height);
+  };
+
+  await page.keyboard.press('q');
+  await canvasPoint(350, 370);
+  await expect(page.locator('.guided-hint')).toContainText('3/5 · START THE WAVE');
+  await page.getByRole('button', { name: 'Start now' }).click();
+  await page.locator('.hud-right .btn').first().click();
+  await page.locator('.hud-right .btn').first().click();
+
+  const reinforcement = page.locator('.guided-hint');
+  await expect(reinforcement).toContainText('5/5 · REINFORCE', { timeout: 35_000 });
+  const [hintBox, hudBox, stageBox] = await Promise.all([
+    reinforcement.boundingBox(), page.locator('.hud').boundingBox(), page.locator('.stage').boundingBox(),
+  ]);
+  expect(hintBox && hudBox && stageBox).toBeTruthy();
+  expect(hintBox!.y).toBeGreaterThanOrEqual(hudBox!.y - 1);
+  expect(hintBox!.y + hintBox!.height).toBeLessThanOrEqual(hudBox!.y + hudBox!.height + 1);
+  expect(stageBox!.width / stageBox!.height).toBeCloseTo(16 / 9, 1);
+  await expect(page.getByRole('button', { name: 'Build to continue' })).toBeDisabled();
+
+  await page.keyboard.press('e');
+  await canvasPoint(700, 200);
+  await expect(reinforcement).toBeHidden();
 });
 
 test('desktop retains menu and battlefield geometry', async ({ page }) => {

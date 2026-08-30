@@ -193,6 +193,11 @@ export function completeWave(s: GameState): void {
 
 export function stepWave(s: GameState, dt: number, paths: PathDef[]): void {
   if (s.subPhase === 'planning') {
+    const guidedConstruction = s.onboarding.active
+      && (s.onboarding.hint === 'chooseUnit'
+        || s.onboarding.hint === 'placeUnit'
+        || s.onboarding.hint === 'reinforce');
+    if (guidedConstruction) return;
     s.countdown -= dt;
     if (s.countdown <= 0 && s.wave <= s.wavesTotal) startWave(s);
   } else {
