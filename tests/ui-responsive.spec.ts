@@ -40,6 +40,36 @@ for (const viewport of landscapePhones) {
     expect(stage).not.toBeNull();
     expect(stage!.x + stage!.width - (cardBox!.x + cardBox!.width)).toBeGreaterThan(viewport.width * 0.35);
 
+    await page.getByRole('button', { name: 'Tutorial', exact: true }).click();
+    const tutorial = page.locator('.tutorial-card');
+    await expect(tutorial).toBeVisible();
+    for (const heading of ['Mission and game loop', 'Build your CAR-T defense', 'Match toxicity to treatment', 'Read the battlefield']) {
+      await expect(tutorial.getByRole('heading', { level: 1 })).toHaveText(heading);
+      const tutorialBox = await tutorial.boundingBox();
+      expect(tutorialBox).not.toBeNull();
+      expect(tutorialBox!.x + tutorialBox!.width).toBeLessThanOrEqual(viewport.width * 0.55 + 1);
+      expect(tutorialBox!.y).toBeGreaterThanOrEqual(0);
+      expect(tutorialBox!.y + tutorialBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+      const tutorialActions = tutorial.locator('.menu-actions .btn');
+      for (let index = 0; index < await tutorialActions.count(); index += 1) {
+        await expect(tutorialActions.nth(index)).toBeInViewport();
+      }
+      if (heading === 'Match toxicity to treatment') {
+        await expect(tutorial).toContainText('Tocilizumab → CRS');
+        await expect(tutorial).toContainText('Dexamethasone → Neurotoxicity');
+        await expect(tutorial.locator('.tutorial-body')).toHaveCSS('overflow-y', 'auto');
+        const finalTreatment = tutorial.getByRole('heading', { name: 'Stem-Cell Boost → Major recovery' });
+        await finalTreatment.scrollIntoViewIfNeeded();
+        await expect(finalTreatment).toBeInViewport();
+      }
+      const next = page.getByRole('button', { name: 'Next', exact: true });
+      if (await next.isVisible()) await next.click();
+    }
+    await expect(tutorial).toContainText('not medical advice');
+    await expect(page.getByRole('button', { name: 'Start Guided Marrow Run' })).toBeInViewport();
+    await page.getByRole('button', { name: 'Back to menu' }).click();
+    await expect(page.locator('.start-card:not(.tutorial-card)')).toBeVisible();
+
     await page.getByRole('button', { name: 'Start Marrow' }).click();
     await expect(page.locator('.menu')).toHaveClass(/hidden/);
     const [gameStage, canvas, units, abilities, hud, banner] = await Promise.all([
@@ -89,6 +119,16 @@ test('desktop retains menu and battlefield geometry', async ({ page }) => {
   expect(menu && stage).toBeTruthy();
   expect(menu!.width).toBeGreaterThan(500);
   expect(stage!.width).toBeGreaterThan(900);
+  expect(menu!.x + menu!.width).toBeLessThanOrEqual(stage!.x + stage!.width * 0.52 + 1);
+  await page.getByRole('button', { name: 'Tutorial', exact: true }).click();
+  const tutorial = page.locator('.tutorial-card');
+  await expect(tutorial).toBeVisible();
+  await expect(tutorial).toContainText('Mission and game loop');
+  await expect(tutorial).toContainText('not medical advice');
+  const tutorialBox = await tutorial.boundingBox();
+  expect(tutorialBox).not.toBeNull();
+  expect(tutorialBox!.x + tutorialBox!.width).toBeLessThanOrEqual(stage!.x + stage!.width * 0.52 + 1);
+  await page.getByRole('button', { name: 'Back to menu' }).click();
   await page.getByRole('button', { name: 'Start Marrow' }).click();
   const gameStage = await page.locator('.stage').boundingBox();
   const canvas = await page.locator('.stage canvas').boundingBox();

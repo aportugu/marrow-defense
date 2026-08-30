@@ -292,6 +292,31 @@
     background: rgba(20, 8, 18, 0.96);
   }
 
+  .opening-menu .menu-card.tutorial-card {
+    width: min(400px, var(--phone-menu-width));
+    max-height: calc(100dvh - 20px);
+    padding: 8px 10px;
+  }
+
+  .tutorial-card .menu-kicker { margin: 0 0 2px; font-size: 7px; }
+  .tutorial-card h1 { margin-bottom: 3px; font-size: 17px; letter-spacing: .05em; }
+  .tutorial-summary { margin-bottom: 5px; font-size: 9px; line-height: 1.2; }
+  .tutorial-grid { grid-template-columns: 1fr; gap: 4px; }
+  .tutorial-item { padding: 5px 7px; border-radius: 7px; }
+  .tutorial-item h2 { margin-bottom: 1px; font-size: 9px; }
+  .tutorial-item p { font-size: 8px; line-height: 1.2; }
+  .tutorial-progress { gap: 5px; margin-top: 4px; }
+  .tutorial-dot { width: 5px; height: 5px; }
+  .tutorial-disclaimer { margin-top: 4px; font-size: 7px; line-height: 1.15; }
+  .tutorial-card .menu-actions { gap: 4px; margin-top: 5px; }
+  .tutorial-card .menu-actions .btn,
+  .tutorial-card.start-card .menu-actions .btn,
+  .tutorial-card.start-card .menu-actions .btn:first-child {
+    min-height: 34px;
+    padding: 4px 5px;
+    font-size: 9px;
+  }
+
   .opening-menu .start-card h1 { font-size: 23px; margin-bottom: 5px; }
   .opening-menu .start-card .menu-kicker { margin-bottom: 4px; font-size: 8px; }
   .opening-menu .start-card .tag { margin-bottom: 6px; font-size: 10px; line-height: 1.25; }
@@ -356,6 +381,16 @@
     min-height: 38px;
     font-size: 12px;
   }
+
+  .opening-menu .menu-card.tutorial-card { max-height: calc(100dvh - 12px); padding: 6px 9px; }
+  .tutorial-card h1 { font-size: 15px; }
+  .tutorial-summary { margin-bottom: 3px; font-size: 8px; }
+  .tutorial-item { padding: 4px 6px; }
+  .tutorial-item h2 { font-size: 8px; }
+  .tutorial-item p { font-size: 7px; }
+  .tutorial-card .menu-actions .btn,
+  .tutorial-card.start-card .menu-actions .btn,
+  .tutorial-card.start-card .menu-actions .btn:first-child { min-height: 32px; font-size: 8px; }
 
 }
 

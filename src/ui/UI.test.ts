@@ -168,7 +168,81 @@ describe('UI', () => {
     expect(document.querySelector('.menu-kicker')?.textContent).toBe('CHOOSE YOUR BATTLEFIELD');
     expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start Marrow')).toBe(true);
     expect([...document.querySelectorAll<HTMLButtonElement>('.menu-actions [data-mobile-label]')]
-      .map((button) => button.dataset.mobileLabel)).toEqual(['Controls', 'Glossary', 'Settings']);
+      .map((button) => button.dataset.mobileLabel)).toEqual(['Tutorial', 'Glossary', 'Settings']);
+  });
+
+  it('explains the game and treatment matching in a four-page tutorial', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const { game, state } = setup();
+    state.phase = 'menu';
+    game.cb.onSync?.(state);
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Tutorial')?.click();
+    game.cb.onSync?.(state);
+
+    const card = document.querySelector('.tutorial-card')!;
+    expect(card.textContent).toContain('Mission and game loop');
+    expect(card.textContent).toContain('Defend the patient through 10 waves');
+    expect(document.activeElement).toBe(card);
+
+    const pageText = [card.textContent ?? ''];
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Next')?.click();
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.tutorial-card h1')?.textContent).toBe('Build your CAR-T defense');
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Previous')?.click();
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.tutorial-card h1')?.textContent).toBe('Mission and game loop');
+
+    for (const title of ['Build your CAR-T defense', 'Match toxicity to treatment', 'Read the battlefield']) {
+      [...document.querySelectorAll('button')].find((button) => button.textContent === 'Next')?.click();
+      game.cb.onSync?.(state);
+      expect(document.querySelector('.tutorial-card h1')?.textContent).toBe(title);
+      pageText.push(document.querySelector('.tutorial-card')?.textContent ?? '');
+    }
+
+    const tutorial = document.querySelector('.tutorial-card')!;
+    const completeTutorial = pageText.join(' ');
+    expect(completeTutorial).toContain('Tocilizumab → CRS');
+    expect(completeTutorial).toContain('Dexamethasone → Neurotoxicity');
+    expect(completeTutorial).toContain('Anakinra → IEC-HS');
+    expect(completeTutorial).toContain('G-CSF → Hematotoxicity');
+    expect(completeTutorial).toContain('Stem-Cell Boost → Major recovery');
+    expect(tutorial.textContent).toContain('not medical advice');
+    expect(tutorial.textContent).toContain('CRS, neurotoxicity, or IEC-HS reaching 100');
+    expect(document.querySelector('.tutorial-progress')?.getAttribute('aria-label')).toBe('Tutorial page 4 of 4');
+  });
+
+  it('starts the selected level as a guided run from the tutorial', () => {
+    const { game, state } = setup();
+    state.phase = 'menu';
+    game.cb.onSync?.(state);
+    const liver = [...document.querySelectorAll<HTMLButtonElement>('.level-card')].find((button) => button.textContent?.startsWith('Hepatic'))!;
+    liver.click();
+    game.cb.onSync?.(state);
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Tutorial')?.click();
+    game.cb.onSync?.(state);
+    for (let page = 1; page < 4; page += 1) {
+      [...document.querySelectorAll('button')].find((button) => button.textContent === 'Next')?.click();
+      game.cb.onSync?.(state);
+    }
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Start Guided Hepatic Run')?.click();
+    expect(game.begin).toHaveBeenCalledWith('liver', true);
+  });
+
+  it('returns from the pause tutorial without restarting or resuming', () => {
+    const { game, state } = setup();
+    state.phase = 'paused';
+    game.cb.onSync?.(state);
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Tutorial')?.click();
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.tutorial-card')).toBeTruthy();
+    [...document.querySelectorAll('button')].find((button) => button.textContent === 'Back to paused game')?.click();
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.menu-card h1')?.textContent).toBe('PAUSED');
+    expect(game.begin).not.toHaveBeenCalled();
+    expect(game.togglePause).not.toHaveBeenCalled();
   });
 
   it('restores the gameplay layout after leaving the opening menu', () => {
