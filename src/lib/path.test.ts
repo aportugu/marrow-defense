@@ -129,4 +129,23 @@ describe('path', () => {
       expect(valid).toBe(true);
     }
   });
+
+  it('keeps legal guided placement available beside every Neuroaxis route', () => {
+    const cns = buildPaths('cns');
+    for (const target of cns) {
+      let valid = false;
+      for (let d = 80; d < target.length - 80 && !valid; d += 20) {
+        const point = posAt(target, d);
+        for (let radius = 50; radius <= 100 && !valid; radius += 5) {
+          for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
+            const x = point.x + Math.cos(angle) * radius;
+            const y = point.y + Math.sin(angle) * radius;
+            if (Math.abs(distToPath(target, x, y) - distToLanePaths(cns, x, y)) > 1e-6) continue;
+            if (guidedPlacementFailure(cns, [], 'memory', x, y) === null) { valid = true; break; }
+          }
+        }
+      }
+      expect(valid).toBe(true);
+    }
+  });
 });

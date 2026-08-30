@@ -116,6 +116,16 @@ function drawPath(ctx: CanvasRenderingContext2D, path: PathDef, time: number, co
   ctx.restore();
 }
 
+function drawCnsPathBed(ctx: CanvasRenderingContext2D, path: PathDef, color: string): void {
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = withAlpha(color, 0.13);
+  ctx.lineWidth = 34;
+  strokePolyline(ctx, path.points);
+  ctx.restore();
+}
+
 function drawGuidedPlacementBand(
   ctx: CanvasRenderingContext2D,
   paths: PathDef[],
@@ -194,24 +204,29 @@ function drawArrow(ctx: CanvasRenderingContext2D, from: Vec, to: Vec): void {
 }
 
 function drawNormalCsfFlow(ctx: CanvasRenderingContext2D, time: number, reduced: boolean): void {
-  const points: Vec[] = [
-    { x: 418, y: 305 }, { x: 510, y: 296 }, { x: 575, y: 320 }, { x: 640, y: 348 },
-    { x: 688, y: 377 }, { x: 741, y: 414 }, { x: 814, y: 446 }, { x: 895, y: 466 },
+  const traces: Vec[][] = [
+    [
+      { x: 390, y: 35 }, { x: 350, y: 165 }, { x: 330, y: 330 },
+      { x: 350, y: 500 }, { x: 430, y: 680 },
+    ],
+    [
+      { x: 890, y: 35 }, { x: 930, y: 165 }, { x: 950, y: 330 },
+      { x: 930, y: 500 }, { x: 850, y: 680 },
+    ],
   ];
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.strokeStyle = 'rgba(125,211,252,.7)'; ctx.fillStyle = '#bae6fd'; ctx.lineWidth = 2.2;
-  ctx.setLineDash([10, 8]); ctx.lineDashOffset = reduced ? 0 : -time * 18;
-  strokePolyline(ctx, points); ctx.setLineDash([]);
-  for (let index = 1; index < points.length; index += 2) drawArrow(ctx, points[index - 1], points[index]);
-  ctx.font = '800 10px system-ui, sans-serif'; ctx.fillStyle = '#bae6fd';
-  ctx.fillText('NORMAL CSF FLOW', 492, 268);
+  ctx.strokeStyle = 'rgba(125,211,252,.48)'; ctx.fillStyle = 'rgba(186,230,253,.72)'; ctx.lineWidth = 1.6;
+  ctx.setLineDash([3, 12]); ctx.lineDashOffset = reduced ? 0 : -time * 12;
+  for (const points of traces) {
+    strokePolyline(ctx, points);
+    if (points.length > 3) drawArrow(ctx, points[points.length - 3], points[points.length - 2]);
+  }
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
 function drawCnsRouteLayer(ctx: CanvasRenderingContext2D, s: GameState, paths: PathDef[], time: number, reduced: boolean): void {
   const activeLanes = new Set(s.activeCnsBreaches.map((event) => event.lane));
-  const routeNames = ['BBB / PERIVASCULAR', 'CHOROID / VENTRICULAR', 'PIAL / LEPTOMENINGEAL'];
-  const symbols = ['BBB', 'VENT', 'PIA'];
   const dash = [[3, 9], [12, 6], [18, 5, 3, 5]];
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (let index = 0; index < paths.length; index++) {
@@ -222,47 +237,7 @@ function drawCnsRouteLayer(ctx: CanvasRenderingContext2D, s: GameState, paths: P
     ctx.lineWidth = active ? 9 : 3;
     ctx.setLineDash(dash[index]); ctx.lineDashOffset = reduced ? 0 : -time * (18 + index * 5);
     strokePolyline(ctx, paths[index].points);
-    const marker = posAt(paths[index], 118);
-    ctx.setLineDash([]); ctx.shadowBlur = 0;
-    ctx.fillStyle = active ? '#fdf2f8' : 'rgba(226,232,240,.72)';
-    ctx.font = '900 9px system-ui, sans-serif';
-    ctx.fillText(`${symbols[index]} · ${routeNames[index]}`, marker.x + 8, marker.y - 13);
   }
-  ctx.restore();
-}
-
-const CNS_LABELS: ReadonlyArray<{ text: string; x: number; y: number; tx: number; ty: number }> = [
-  { text: 'ARACHNOID GRANULATIONS', x: 268, y: 76, tx: 360, ty: 90 },
-  { text: 'SUPERIOR SAGITTAL SINUS', x: 450, y: 48, tx: 540, ty: 74 },
-  { text: 'CEREBRAL SUBARACHNOID SPACE', x: 636, y: 83, tx: 718, ty: 115 },
-  { text: 'PENETRATING CORTICAL VESSEL', x: 710, y: 157, tx: 746, ty: 205 },
-  { text: 'PERIVASCULAR SPACE', x: 750, y: 236, tx: 782, ty: 272 },
-  { text: 'CHOROID PLEXUS', x: 298, y: 262, tx: 427, ty: 301 },
-  { text: 'LATERAL VENTRICLE', x: 322, y: 337, tx: 452, ty: 311 },
-  { text: 'FORAMEN OF MONRO', x: 450, y: 376, tx: 522, ty: 316 },
-  { text: 'THIRD VENTRICLE', x: 532, y: 404, tx: 575, ty: 336 },
-  { text: 'CEREBRAL AQUEDUCT', x: 622, y: 444, tx: 651, ty: 359 },
-  { text: 'FOURTH VENTRICLE', x: 694, y: 486, tx: 715, ty: 402 },
-  { text: 'MAGENDIE / LUSCHKA', x: 780, y: 515, tx: 766, ty: 434 },
-  { text: 'BASAL CISTERNS', x: 850, y: 500, tx: 829, ty: 455 },
-  { text: 'FORAMEN MAGNUM', x: 866, y: 560, tx: 931, ty: 487 },
-  { text: 'SPINAL SUBARACHNOID SPACE', x: 973, y: 344, tx: 1024, ty: 382 },
-  { text: 'CONUS MEDULLARIS', x: 969, y: 496, tx: 1080, ty: 526 },
-  { text: 'LUMBAR CISTERN', x: 970, y: 570, tx: 1102, ty: 582 },
-  { text: 'CAUDA EQUINA', x: 970, y: 624, tx: 1120, ty: 616 },
-];
-
-function drawCnsLabels(ctx: CanvasRenderingContext2D): void {
-  ctx.save(); ctx.font = '700 8px system-ui, sans-serif'; ctx.textBaseline = 'middle';
-  for (const label of CNS_LABELS) {
-    const width = ctx.measureText(label.text).width;
-    ctx.strokeStyle = 'rgba(186,230,253,.42)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(label.x + width / 2, label.y + (label.y < label.ty ? 7 : -7)); ctx.lineTo(label.tx, label.ty); ctx.stroke();
-    ctx.fillStyle = 'rgba(4,12,26,.78)'; ctx.fillRect(label.x - 4, label.y - 7, width + 8, 14);
-    ctx.fillStyle = '#dbeafe'; ctx.fillText(label.text, label.x, label.y);
-  }
-  ctx.fillStyle = '#c4b5fd'; ctx.font = '900 9px system-ui, sans-serif';
-  ctx.fillText('SPINAL INSET · SEPARATELY SCALED', 970, 326);
   ctx.restore();
 }
 
@@ -454,7 +429,7 @@ function drawBossHud(ctx: CanvasRenderingContext2D, s: GameState): void {
   const shielded = boss.type === 'parenchymalCore'
     ? s.enemies.some((enemy) => enemy.alive && enemy.type === 'sanctuaryDeposit')
     : s.enemies.some((enemy) => enemy.alive && enemy.behavior === 'bossEscort' && enemy.parentBossId === boss.id);
-  const name = boss.type === 'parenchymalCore' ? 'PERIVENTRICULAR PARENCHYMAL CORE' : 'HEPATIC PLASMACYTOMA CORE';
+  const name = boss.type === 'parenchymalCore' ? 'INTRAMEDULLARY SPINAL CORE' : 'HEPATIC PLASMACYTOMA CORE';
   ctx.fillText(`${name} · PHASE ${boss.bossPhase ?? 1}${shielded ? ' · SANCTUARY SHIELD' : ''}`, x + w / 2, y);
   ctx.fillStyle = 'rgba(255,255,255,.1)';
   ctx.fillRect(x, y + 10, w, 9);
@@ -666,17 +641,17 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState, v: View): vo
     const laneColors = LEVELS[s.level].lanes.map((lane) => lane.color);
     if (s.level === 'liver') drawHepaticEventLayer(ctx, s, v.paths, time, v.kineticSignals.reducedMotion);
     if (s.level === 'cns') {
+      for (let i = 0; i < v.paths.length; i++) drawCnsPathBed(ctx, v.paths[i], laneColors[i % laneColors.length]);
       drawNormalCsfFlow(ctx, time, v.kineticSignals.reducedMotion);
       drawCnsRouteLayer(ctx, s, v.paths, time, v.kineticSignals.reducedMotion);
     }
     const guidedConstruction = s.onboarding.active
       && (s.onboarding.hint === 'placeUnit' || s.onboarding.hint === 'reinforce');
     if (guidedConstruction && v.buildType) drawGuidedPlacementBand(ctx, v.paths, v.buildType);
-    for (let i = 0; i < v.paths.length; i++) {
+    if (s.level !== 'cns') for (let i = 0; i < v.paths.length; i++) {
       drawPath(ctx, v.paths[i], time, laneColors[i % laneColors.length]);
     }
     if (s.level === 'liver') drawHepaticLabels(ctx, v.paths);
-    if (s.level === 'cns') drawCnsLabels(ctx);
     for (const t of s.towers) drawTower(ctx, t, v.selectedTower === t.id, time, s.stats.time < s.dexaUntil, s.subPhase === 'planning', v.kineticSignals.reducedMotion);
     for (const e of s.enemies) {
       if (!e.alive || e.behavior !== 'bossEscort' || e.parentBossId == null) continue;

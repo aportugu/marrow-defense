@@ -21,10 +21,7 @@ export interface LaneDef {
 export interface LevelDef {
   id: LevelId;
   name: string;
-  tagline: string;
   difficulty: 'STANDARD' | 'ADVANCED' | 'EXPERT';
-  difficultySummary: string;
-  recommendedText: string;
   startCurrency: number;
   scoreKillTarget: number;
   scoreTimeTarget: number;
@@ -57,10 +54,7 @@ export const LEVELS: Record<LevelId, LevelDef> = {
   marrow: {
     id: 'marrow',
     name: 'Marrow',
-    tagline: 'Medullary plasmacytoma in the bone marrow',
     difficulty: 'STANDARD',
-    difficultySummary: 'Single-lane defense',
-    recommendedText: '',
     startCurrency: 120,
     scoreKillTarget: 287,
     scoreTimeTarget: 720,
@@ -72,10 +66,7 @@ export const LEVELS: Record<LevelId, LevelDef> = {
   liver: {
     id: 'liver',
     name: 'Hepatic',
-    tagline: 'Extramedullary plasmacytoma in the liver',
     difficulty: 'ADVANCED',
-    difficultySummary: '3 CONVERGING LANES',
-    recommendedText: 'Recommended after Marrow',
     startCurrency: 220,
     scoreKillTarget: 230,
     scoreTimeTarget: 660,
@@ -120,17 +111,14 @@ export const LEVELS: Record<LevelId, LevelDef> = {
   cns: {
     id: 'cns',
     name: 'Neuroaxis',
-    tagline: 'Hybrid CNS myeloma relapse across barriers, CSF, and parenchyma',
     difficulty: 'EXPERT',
-    difficultySummary: '3 CNS INTERFACES · DYNAMIC BREACHES',
-    recommendedText: 'Highest complexity',
     startCurrency: 260,
     scoreKillTarget: 225,
     scoreTimeTarget: 720,
     waves: CNS_WAVES,
     lanes: [
       {
-        name: 'Cerebral microvasculature', color: '#fb7185', label: 'BBB · perivascular route',
+        name: 'Spinal microvasculature', color: '#fb7185', label: 'BSCB · spinal perivascular route',
         mods: { ...NEUTRAL, cnsDrifter: { hp: .95, speed: 1.05, reward: 1.1 }, sanctuaryClone: { hp: 1.1, speed: 1, reward: 1.15 }, parenchymalCore: { hp: 1, speed: 1, reward: 1 } },
       },
       {

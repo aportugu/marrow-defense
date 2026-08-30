@@ -83,8 +83,9 @@ const breach = (
   enemyType: EnemyTypeId,
 ): CnsBreachDef => ({ interface: interfaceName, at, lane, count, enemyType });
 
-// Neuroaxis: lane 0 is cerebral microvascular/perivascular, lane 1 follows the
-// ventricular CSF sequence, and lane 2 follows the craniospinal leptomeninges.
+// Neuroaxis: lane 0 is the spinal microvascular/perivascular track, lane 1
+// carries an upstream blood-CSF threat into the left spinal CSF space, and
+// lane 2 follows the right spinal leptomeninges.
 export const CNS_WAVES: Wave[] = [
   { groups: [g('standard', 7, 2, 1, 0)], cnsBreaches: [breach('bbb', 7, 0, 3, 'cnsDrifter')] },
   { groups: [g('standard', 6, 1.8, 1, 0), g('cnsDrifter', 4, 1.1, 5, 1)], cnsBreaches: [breach('bloodCsf', 10, 1, 4, 'cnsDrifter')] },

@@ -60,7 +60,7 @@ export class StageView {
       if (game.buildType) {
         const result = game.tryPlace(x, y, game.buildType);
         if (result.ok) game.setBuildType(null);
-        else this.showNotice({ text: { path: game.state.level === 'liver' ? 'Too close to a vascular stream' : 'Too close to the marrow stream', lane: 'Place this cell closer to a lane so enemies enter its firing range.', overlap: 'Too close to another unit', bounds: 'Build inside the boundary', funding: 'Not enough funding' }[result.reason], level: 'warning' });
+        else this.showNotice({ text: { path: game.state.level === 'liver' ? 'Too close to a vascular stream' : game.state.level === 'cns' ? 'Too close to a spinal disease route' : 'Too close to the marrow stream', lane: 'Place this cell closer to a lane so enemies enter its firing range.', overlap: 'Too close to another unit', bounds: 'Build inside the boundary', funding: 'Not enough funding' }[result.reason], level: 'warning' });
         return;
       }
       const tower = this.nearestTower(x, y, 26);
@@ -152,8 +152,8 @@ export class StageView {
     if (key === this.lastBannerKey) return;
     this.lastBannerKey = key; const title = WAVE_TITLES[state.level][state.wave];
     const eventLabel = event ? `<div class="hepatic-event ${event.stage}"><b>${event.stage === 'warning' ? 'PLASMA-CELL SURGE' : 'SURGE ACTIVE'} — ${LEVELS.liver.lanes[event.lane].name.toUpperCase()}</b>${event.stage === 'warning' ? `<span>IMPACT IN ${seconds}s</span>` : ''}</div>` : '';
-    const cnsNames = { bloodCsf: 'CONTAIN CHOROID PLEXUS ENTRY', bbb: 'CONTAIN CORTICAL BBB BREACH', leptomeningeal: 'CONTAIN LEPTOMENINGEAL ENTRY' } as const;
-    const cnsLabel = cnsEvents.map((breach) => `<div class="cns-event ${breach.stage} route-${breach.interface}"><span class="route-symbol" aria-hidden="true">${breach.interface === 'bloodCsf' ? 'VENT' : breach.interface === 'bbb' ? 'BBB' : 'PIA'}</span><b>${cnsNames[breach.interface]}</b><span>${breach.contained ? 'CONTAINED · DELAYED' : breach.stage === 'warning' ? `${Math.max(0, Math.ceil(breach.remaining))}s · R CONTAINS MOST IMMINENT` : 'BREACH ACTIVE'}</span></div>`).join('');
+    const cnsNames = { bloodCsf: 'CONTAIN CHOROID PLEXUS ENTRY', bbb: 'CONTAIN SPINAL BARRIER BREACH', leptomeningeal: 'CONTAIN LEPTOMENINGEAL ENTRY' } as const;
+    const cnsLabel = cnsEvents.map((breach) => `<div class="cns-event ${breach.stage} route-${breach.interface}"><span class="route-symbol" aria-hidden="true">${breach.interface === 'bloodCsf' ? 'VENT' : breach.interface === 'bbb' ? 'BSCB' : 'PIA'}</span><b>${cnsNames[breach.interface]}</b><span>${breach.contained ? 'CONTAINED · DELAYED' : breach.stage === 'warning' ? `${Math.max(0, Math.ceil(breach.remaining))}s · R CONTAINS MOST IMMINENT` : 'BREACH ACTIVE'}</span></div>`).join('');
     this.banner.innerHTML = `${guidedHint}${eventLabel}${cnsLabel}<div class="b-line big">WAVE ${Math.min(state.wave, state.wavesTotal)}${title ? ` · ${title}` : ''}</div>`;
   }
 
@@ -190,7 +190,7 @@ export class StageView {
     this.updateNotice(state);
     const event = state.activeHepaticEvent ? `, ${state.activeHepaticEvent.stage === 'warning' ? 'incoming' : 'active'} plasma-cell surge in ${LEVELS.liver.lanes[state.activeHepaticEvent.lane].name}` : '';
     const cnsEvent = state.activeCnsBreaches.map((breach) => `${breach.stage} ${breach.interface} event`).join(', ');
-    this.canvas.setAttribute('aria-label', state.level === 'liver' ? `Advanced hepatic plasmacytoma defense battlefield with portal, arterial, and biliary lanes${event}` : state.level === 'cns' ? `Expert Neuroaxis CNS myeloma battlefield. Distinct cortical blood-brain barrier, choroid plexus blood-CSF, and pial leptomeningeal routes. ${cnsEvent}` : 'Bone marrow defense battlefield');
+    this.canvas.setAttribute('aria-label', state.level === 'liver' ? `Advanced hepatic plasmacytoma defense battlefield with portal, arterial, and biliary lanes${event}` : state.level === 'cns' ? `Expert Neuroaxis CNS myeloma battlefield showing only a prominent posterior spinal cord, spinal subarachnoid space, nerve roots, conus, lumbar cistern, and cauda equina. Distinct blood-spinal cord barrier, blood-CSF, and leptomeningeal routes. ${cnsEvent}` : 'Bone marrow defense battlefield');
     this.cnsAnatomy.setAttribute('aria-hidden', String(state.level !== 'cns'));
     for (const item of this.cnsAnatomy.children) (item as HTMLElement).tabIndex = state.level === 'cns' ? 0 : -1;
     if (state.iecHsUnlocked) {

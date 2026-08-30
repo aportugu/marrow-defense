@@ -94,11 +94,11 @@ export class MenuView {
         const definition = LEVELS[id]; const selected = this.selectedLevel === id;
         const button = el('button', `level-card level-${id}${id === 'liver' ? ' advanced' : ''}${id === 'cns' ? ' expert' : ''}${selected ? ' selected' : ''}`);
         button.setAttribute('aria-pressed', String(selected));
-        button.innerHTML = `<div class="lc-head"><span class="lc-name">${definition.name}</span><span class="lc-difficulty">${definition.difficulty}</span></div><div class="lc-tag">${definition.tagline}</div><div class="lc-summary">10 WAVES · ${definition.difficultySummary}</div>${definition.recommendedText ? `<div class="lc-recommended">${definition.recommendedText}</div>` : ''}<div class="lc-footer"><span class="lc-best">${this.game.progress.best[id] ? `Best: ${this.game.progress.best[id]!.response} · ${this.game.progress.best[id]!.score} pts` : 'Best: —'}</span><span class="lc-state">${selected ? 'SELECTED' : 'SELECT'}</span></div>`;
+        button.innerHTML = `<div class="lc-head"><span class="lc-name">${definition.name}</span><span class="lc-difficulty">${definition.difficulty}</span></div><div class="lc-footer"><span class="lc-best">${this.game.progress.best[id] ? `Best: ${this.game.progress.best[id]!.response} · ${this.game.progress.best[id]!.score} pts` : 'Best: —'}</span><span class="lc-state">${selected ? 'SELECTED' : 'SELECT'}</span></div>`;
         button.addEventListener('click', () => { this.selectedLevel = id; this.game.previewLevel(id); this.lastMenuKey = ''; });
         levelRow.appendChild(button);
       }
-      card.append(el('p', 'menu-kicker', 'CHOOSE YOUR BATTLEFIELD'), el('h1', undefined, 'MARROW DEFENSE'), el('p', 'tag', 'Defend the patient with engineered CAR-T cells across three distinct plasmacytoma campaigns.'), el('p', 'hs', `RUN HIGH SCORE · ${this.game.highScore} pts`), levelRow, description);
+      card.append(el('p', 'menu-kicker', 'CHOOSE YOUR BATTLEFIELD'), el('h1', undefined, 'MARROW DEFENSE'), el('p', 'tag', 'Defend the patient with CAR-T cells across three distinct campaigns.'), el('p', 'hs', `RUN HIGH SCORE · ${this.game.highScore} pts`), levelRow, description);
       const startLabel = this.selectedLevel === 'liver' ? 'Start Hepatic — Advanced' : this.selectedLevel === 'cns' ? 'Start Neuroaxis — Expert' : 'Start Marrow';
       addButton(startLabel, 'begin');
       addButton('Tutorial', 'open-tutorial', true, 'Tutorial'); addButton('Neuroaxis Anatomy Atlas', 'open-atlas', true, 'CNS Atlas'); addButton('Clinical Glossary', 'howto', true, 'Glossary'); addButton('Settings', 'settings', true, 'Settings');

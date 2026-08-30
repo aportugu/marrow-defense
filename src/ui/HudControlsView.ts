@@ -170,14 +170,14 @@ export class HudControlsView {
           for (const warning of warnings) {
             const names = {
               bloodCsf: 'CHOROID PLEXUS',
-              bbb: 'CORTICAL BBB',
+              bbb: 'SPINAL BARRIER',
               leptomeningeal: 'LEPTOMENINGEAL',
             } as const;
             const button = el('button', `cns-contain route-${warning.interface}`);
             button.type = 'button';
             button.disabled = state.cnsContainmentUsed || state.currency < CNS.containmentCost || warning.contained;
             button.setAttribute('aria-label', `Contain ${names[warning.interface].toLowerCase()} entry, ${Math.max(0, Math.ceil(warning.remaining))} seconds, costs ${CNS.containmentCost} funding`);
-            button.innerHTML = `<span class="route-symbol" aria-hidden="true">${warning.interface === 'bloodCsf' ? 'VENT' : warning.interface === 'bbb' ? 'BBB' : 'PIA'}</span><span>${names[warning.interface]} · ${Math.max(0, Math.ceil(warning.remaining))}s</span><b>${warning.contained ? 'DELAYED' : state.cnsContainmentUsed ? 'USED' : `CONTAIN ${CNS.containmentCost}`}</b>`;
+            button.innerHTML = `<span class="route-symbol" aria-hidden="true">${warning.interface === 'bloodCsf' ? 'VENT' : warning.interface === 'bbb' ? 'BSCB' : 'PIA'}</span><span>${names[warning.interface]} · ${Math.max(0, Math.ceil(warning.remaining))}s</span><b>${warning.contained ? 'DELAYED' : state.cnsContainmentUsed ? 'USED' : `CONTAIN ${CNS.containmentCost}`}</b>`;
             button.addEventListener('click', () => this.game.containCnsBreach(warning.id));
             this.cnsWarnings.appendChild(button);
           }

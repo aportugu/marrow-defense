@@ -52,47 +52,67 @@ export interface KineticSignals {
 
 function drawCnsAnatomy(ctx: CanvasRenderingContext2D, t: number, signals: KineticSignals): void {
   ctx.save();
-  const tissue = ctx.createLinearGradient(100, 60, 1040, 610);
-  tissue.addColorStop(0, 'rgba(35,55,84,.92)');
-  tissue.addColorStop(.55, 'rgba(24,35,62,.94)');
-  tissue.addColorStop(1, 'rgba(10,19,38,.97)');
-  ctx.fillStyle = tissue;
-  ctx.strokeStyle = 'rgba(148,197,255,.3)';
-  ctx.lineWidth = 3;
+  // The live battlefield is a single, full-width posterior spinal preparation.
+  // Cranial interface origins remain part of the campaign model but stay off-field.
+  const spinalSpace = ctx.createLinearGradient(190, 30, 1090, 700);
+  spinalSpace.addColorStop(0, 'rgba(17,42,70,.72)');
+  spinalSpace.addColorStop(.7, 'rgba(13,31,57,.82)');
+  spinalSpace.addColorStop(1, 'rgba(8,19,38,.9)');
+  ctx.fillStyle = spinalSpace;
+  ctx.strokeStyle = 'rgba(125,211,252,.3)'; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(120, 338);
-  ctx.bezierCurveTo(90, 190, 210, 68, 430, 54);
-  ctx.bezierCurveTo(650, 38, 865, 132, 904, 284);
-  ctx.bezierCurveTo(928, 380, 866, 474, 735, 500);
-  ctx.bezierCurveTo(595, 548, 390, 526, 236, 468);
-  ctx.bezierCurveTo(166, 438, 128, 394, 120, 338);
-  ctx.closePath();
-  ctx.fill(); ctx.stroke();
+  ctx.moveTo(250, 36); ctx.bezierCurveTo(210, 175, 225, 370, 255, 520);
+  ctx.bezierCurveTo(270, 615, 320, 686, 395, 706);
+  ctx.lineTo(885, 706);
+  ctx.bezierCurveTo(960, 686, 1010, 615, 1025, 520);
+  ctx.bezierCurveTo(1055, 370, 1070, 175, 1030, 36);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
 
-  // Corpus callosum/ventricular complex: a restrained midsagittal clinical underlay.
-  ctx.strokeStyle = 'rgba(186,230,253,.38)';
-  ctx.lineWidth = 16;
-  ctx.beginPath(); ctx.arc(505, 278, 132, Math.PI * 1.08, Math.PI * 1.88); ctx.stroke();
-  ctx.strokeStyle = 'rgba(56,189,248,.68)';
-  ctx.lineWidth = 8;
+  // Posterior full-length cord with cervical and lumbosacral enlargements.
+  const cord = ctx.createLinearGradient(500, 35, 780, 585);
+  cord.addColorStop(0, 'rgba(143,159,197,.84)');
+  cord.addColorStop(.55, 'rgba(109,121,163,.9)');
+  cord.addColorStop(1, 'rgba(125,107,163,.9)');
+  ctx.fillStyle = cord;
+  ctx.strokeStyle = 'rgba(216,222,255,.5)'; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(420, 306); ctx.bezierCurveTo(500, 265, 584, 284, 624, 336);
-  ctx.lineTo(686, 372); ctx.lineTo(742, 415); ctx.lineTo(820, 446); ctx.stroke();
+  ctx.moveTo(548, 34);
+  ctx.bezierCurveTo(505, 76, 512, 154, 548, 190);
+  ctx.bezierCurveTo(570, 250, 558, 338, 535, 398);
+  ctx.bezierCurveTo(505, 458, 526, 524, 584, 561);
+  ctx.quadraticCurveTo(612, 578, 640, 604);
+  ctx.quadraticCurveTo(668, 578, 696, 561);
+  ctx.bezierCurveTo(754, 524, 775, 458, 745, 398);
+  ctx.bezierCurveTo(722, 338, 710, 250, 732, 190);
+  ctx.bezierCurveTo(768, 154, 775, 76, 732, 34);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(20,35,65,.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(640, 43); ctx.bezierCurveTo(628, 220, 652, 410, 640, 584); ctx.stroke();
 
-  // Separately scaled spinal inset, connected at the foramen magnum.
-  ctx.setLineDash([7, 7]);
-  ctx.strokeStyle = 'rgba(203,213,225,.36)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(956, 316, 244, 334);
-  ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(8,18,35,.78)'; ctx.fillRect(958, 318, 240, 330);
-  ctx.strokeStyle = 'rgba(167,139,250,.55)'; ctx.lineWidth = 20;
-  ctx.beginPath(); ctx.moveTo(1030, 340); ctx.bezierCurveTo(1035, 430, 1058, 520, 1110, 615); ctx.stroke();
-  ctx.strokeStyle = 'rgba(125,211,252,.45)'; ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.moveTo(1030, 340); ctx.bezierCurveTo(1035, 430, 1058, 520, 1110, 615); ctx.stroke();
-  const pulse = signals.reducedMotion ? .35 : .2 + .15 * (1 + Math.sin(t * 2.1));
+  // Paired posterior nerve roots make the cord silhouette readable at a glance.
+  ctx.strokeStyle = 'rgba(167,139,250,.38)'; ctx.lineWidth = 2;
+  for (let y = 86; y <= 516; y += 34) {
+    const spread = y < 190 || y > 390 ? 285 : 235;
+    ctx.beginPath();
+    ctx.moveTo(548, y); ctx.quadraticCurveTo(430, y + 8, 640 - spread, y + 30); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(732, y); ctx.quadraticCurveTo(850, y + 8, 640 + spread, y + 30); ctx.stroke();
+  }
+
+  // Lumbar cistern and the descending cauda-equina roots below the conus.
+  ctx.fillStyle = 'rgba(56,189,248,.08)';
+  ctx.beginPath(); ctx.ellipse(640, 628, 245, 82, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(196,181,253,.45)'; ctx.lineWidth = 2;
+  for (let index = -7; index <= 7; index++) {
+    ctx.beginPath();
+    ctx.moveTo(640 + index * 3, 582);
+    ctx.quadraticCurveTo(640 + index * 13, 635, 640 + index * 25, 710);
+    ctx.stroke();
+  }
+
+  const pulse = signals.reducedMotion ? .07 : .045 + .025 * (1 + Math.sin(t * 2.1));
   ctx.fillStyle = `rgba(96,165,250,${pulse})`;
-  ctx.fillRect(960, 320, 236, 326);
+  ctx.beginPath(); ctx.ellipse(640, 355, 430, 345, 0, 0, Math.PI * 2); ctx.fill();
   if (signals.cnsBurden > 0) {
     ctx.fillStyle = `rgba(232,121,249,${Math.min(.16, signals.cnsBurden / 700)})`;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);

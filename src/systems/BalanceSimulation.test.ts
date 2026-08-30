@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GameState, Tower, UnitTypeId } from '../game/types';
 import { UNIT } from '../game/Balance';
 import { createInitialState, startGame } from '../game/GameState';
-import { buildPaths, distToLanePaths, distToPath, placementFailure, posAt } from '../lib/path';
+import { buildPaths, distToLanePaths, distToPath, placementFailure } from '../lib/path';
 import { activate, canActivate, stepAbilities } from './AbilitySystem';
 import { stepEnemies, stepProjectiles, stepTowers } from './CombatSystem';
 import { checkEnd, stepMeters } from './MeterSystem';
@@ -24,32 +24,14 @@ const liverSpots = [
   [1050, 230], [1050, 350], [1050, 575],
 ] as const;
 
-function makeCnsSpots(): Array<readonly [number, number]> {
-  const result: Array<readonly [number, number]> = [];
-  const prior: Tower[] = [];
-  for (const fraction of [.16, .38, .62, .8]) {
-    for (let lane = 0; lane < cnsPaths.length; lane++) {
-      const point = posAt(cnsPaths[lane], cnsPaths[lane].length * fraction);
-      let found: readonly [number, number] | null = null;
-      for (let radius = 52; radius <= 100 && !found; radius += 6) {
-        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
-          const x = point.x + Math.cos(angle) * radius;
-          const y = point.y + Math.sin(angle) * radius;
-          const nearest = Math.min(...cnsPaths.map((path) => distToPath(path, x, y)));
-          if (Math.abs(distToPath(cnsPaths[lane], x, y) - nearest) > 1e-6) continue;
-          if (placementFailure(cnsPaths, prior, x, y) === null) found = [x, y];
-        }
-      }
-      if (found) {
-        result.push(found);
-        prior.push({ id: prior.length, type: 'bcma', x: found[0], y: found[1], tier: 0, cd: 0, targetId: null, strength: 0, wavesSurvived: 0, buffPower: 0 });
-      }
-    }
-  }
-  return result;
-}
-
-const cnsSpots = makeCnsSpots();
+const cnsSpots = [
+  [590, 410], [570, 440], [400, 280], [820, 180],
+  [480, 360], [850, 300], [600, 140], [890, 450],
+  [500, 520], [590, 660], [320, 140], [770, 660],
+  [440, 60], [430, 650], [670, 200],
+  [470, 300],
+  [780, 480], [600, 580], [580, 680],
+] as const;
 
 function addTower(s: GameState, type: UnitTypeId, spot: number): Tower {
   const [x, y] = spots[spot];
@@ -110,8 +92,8 @@ function runCnsMixed(): GameState {
   const s = createInitialState('cns', 29); startGame(s, false);
   addCnsTower(s, 'bcma', 0); addCnsTower(s, 'bcma', 1);
   const builds: [UnitTypeId, number][] = [
-    ['bcma', 2], ['dual', 8], ['dual', 7], ['bcma', 6], ['dual', 4], ['bcma', 3],
-    ['memory', 10], ['dual', 11], ['bcma', 5], ['dual', 9],
+    ['bcma', 2], ['bcma', 8], ['dual', 7], ['bcma', 6], ['bcma', 4], ['memory', 15], ['bcma', 3],
+    ['bcma', 10], ['bcma', 11], ['bcma', 16],
   ];
   let buildIndex = 0; let safety = 0;
   while (s.phase === 'playing' && safety++ < 60000) {
@@ -130,7 +112,8 @@ function runCnsMixed(): GameState {
     const warning = [...s.activeCnsBreaches].filter((event) => event.stage === 'warning').sort((a, b) => a.remaining - b.remaining)[0];
     if (warning && !s.cnsContainmentUsed && s.currency >= 55 + 75) containCnsBreach(s, warning.id);
     if (s.meters.crs >= 58 && canActivate(s, 'toci')) activate(s, 'toci');
-    if (s.meters.neuro >= 75 && canActivate(s, 'dexa')) activate(s, 'dexa');
+    const activeCore = s.enemies.find((enemy) => enemy.alive && enemy.type === 'parenchymalCore');
+    if (s.meters.neuro >= 90 && (!activeCore || activeCore.hp >= 600) && canActivate(s, 'dexa')) activate(s, 'dexa');
     if (s.meters.hematotoxicity >= 30 && canActivate(s, 'stemcell')) activate(s, 'stemcell');
     else if (s.meters.hematotoxicity >= 20 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
     tickCns(s, .05);

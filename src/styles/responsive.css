@@ -364,19 +364,6 @@
   .opening-menu .start-card .level-card { min-height: 92px; gap: 2px; padding: 6px 7px; }
   .opening-menu .start-card .lc-name { font-size: 14px; }
   .opening-menu .start-card .lc-difficulty { font-size: 7px; padding: 2px 5px; }
-  .opening-menu .start-card .lc-tag { min-height: 23px; font-size: 8px; }
-  .opening-menu .start-card .lc-tag,
-  .opening-menu .start-card .lc-summary {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-  }
-  .opening-menu .start-card .lc-tag { min-height: 0; max-height: 20px; }
-  .opening-menu .start-card .lc-summary { max-height: 17px; line-height: 1.15; }
-  .opening-menu .start-card .lc-summary,
-  .opening-menu .start-card .lc-recommended,
   .opening-menu .start-card .lc-best,
   .opening-menu .start-card .lc-state { font-size: 7px; }
   .opening-menu .start-card .menu-actions { align-items: stretch; margin-top: 4px; gap: 3px; }
@@ -409,10 +396,6 @@
   .opening-menu .start-card .level-card { min-height: 76px; gap: 1px; padding: 4px 5px; }
   .opening-menu .start-card .lc-name { font-size: 12px; }
   .opening-menu .start-card .lc-difficulty { font-size: 6px; padding: 1px 4px; }
-  .opening-menu .start-card .lc-tag { min-height: 18px; font-size: 7px; line-height: 1.2; }
-  .opening-menu .start-card .lc-tag { min-height: 0; max-height: 17px; }
-  .opening-menu .start-card .lc-summary,
-  .opening-menu .start-card .lc-recommended,
   .opening-menu .start-card .lc-best,
   .opening-menu .start-card .lc-state { font-size: 6px; }
 

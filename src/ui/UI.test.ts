@@ -179,6 +179,8 @@ describe('UI', () => {
     expect([...document.querySelectorAll('.level-card')].map((n) => n.classList.contains('selected'))).toEqual([true, false, false]);
     expect([...document.querySelectorAll('.level-card')].map((n) => n.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false']);
     expect(document.querySelector('.menu-kicker')?.textContent).toBe('CHOOSE YOUR BATTLEFIELD');
+    expect(document.querySelector('.start-card > .tag')?.textContent).toBe('Defend the patient with CAR-T cells across three distinct campaigns.');
+    expect(document.querySelectorAll('.lc-tag, .lc-summary, .lc-recommended')).toHaveLength(0);
     expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start Marrow')).toBe(true);
     expect([...document.querySelectorAll<HTMLButtonElement>('.menu-actions [data-mobile-label]')]
       .map((button) => button.dataset.mobileLabel)).toEqual(['Tutorial', 'CNS Atlas', 'Glossary', 'Settings']);
@@ -315,8 +317,8 @@ describe('UI', () => {
     const liverCard = [...document.querySelectorAll<HTMLButtonElement>('.level-card')].find((n) => n.textContent?.startsWith('Hepatic'))!;
     expect(liverCard.disabled).toBe(false);
     expect(liverCard.textContent).toContain('ADVANCED');
-    expect(liverCard.textContent).toContain('3 CONVERGING LANES');
-    expect(liverCard.textContent).toContain('Recommended after Marrow');
+    expect(liverCard.textContent).not.toContain('3 CONVERGING LANES');
+    expect(liverCard.textContent).not.toContain('Recommended after Marrow');
     liverCard.click();
     expect(game.previewLevel).toHaveBeenCalledWith('liver');
   });

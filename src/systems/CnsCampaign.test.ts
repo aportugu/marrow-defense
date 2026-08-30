@@ -3,7 +3,7 @@ import { CNS_WAVES } from '../data/waves';
 import { LEVELS } from '../data/levels';
 import { CNS } from '../game/Balance';
 import { createInitialState, startGame } from '../game/GameState';
-import { CNS_ROUTE_STRUCTURES, buildPaths } from '../lib/path';
+import { CNS_ROUTE_STRUCTURES, buildPaths, cnsRouteAnchor, posAt } from '../lib/path';
 import { killEnemy, stepEnemies, stepProjectiles } from './CombatSystem';
 import { completeWave, containCnsBreach, spawnEnemy, startWave, stepSpawns } from './WaveSystem';
 
@@ -18,13 +18,42 @@ describe('Neuroaxis CNS campaign', () => {
     expect(LEVELS.cns).toMatchObject({ difficulty: 'EXPERT', startCurrency: 260 });
     expect(CNS_WAVES).toHaveLength(10);
     expect(CNS_ROUTE_STRUCTURES[0]).toEqual([
-      'Cerebral microvasculature', 'blood–brain barrier', 'penetrating cortical vessel', 'perivascular space', 'periventricular white matter',
+      'Spinal microvasculature', 'blood–spinal cord barrier', 'penetrating vessel', 'perivascular space', 'spinal white matter',
     ]);
     expect(CNS_ROUTE_STRUCTURES[1]).toContain('foramen of Monro');
     expect(CNS_ROUTE_STRUCTURES[1]).toContain('median and lateral apertures');
+    expect(CNS_ROUTE_STRUCTURES[1]).toContain('spinal subarachnoid space');
     expect(CNS_ROUTE_STRUCTURES[2]).toContain('lumbar cistern');
     expect(new Set(CNS_WAVES.flatMap((wave) => wave.cnsBreaches?.map((breach) => breach.interface) ?? [])))
       .toEqual(new Set(['bbb', 'bloodCsf', 'leptomeningeal']));
+  });
+
+  it('uses a cord-only BBB route and distinct left/right spinal descents without changing travel time', () => {
+    const [bbb, bloodCsf, leptomeningeal] = buildPaths('cns');
+    expect(bbb.length).toBeGreaterThanOrEqual(1406.24 * .95);
+    expect(bbb.length).toBeLessThanOrEqual(1406.24 * 1.05);
+    expect(bloodCsf.length).toBeGreaterThanOrEqual(1406.83 * .95);
+    expect(bloodCsf.length).toBeLessThanOrEqual(1406.83 * 1.05);
+    expect(leptomeningeal.length).toBeGreaterThanOrEqual(1600.25 * .95);
+    expect(leptomeningeal.length).toBeLessThanOrEqual(1600.25 * 1.05);
+
+    const bbbEnd = posAt(bbb, bbb.length);
+    const bloodCsfSpine = posAt(bloodCsf, bloodCsf.length - 300);
+    const leptomeningealSpine = posAt(leptomeningeal, leptomeningeal.length - 300);
+    expect(bbbEnd.x).toBeGreaterThan(580);
+    expect(bbbEnd.x).toBeLessThan(660);
+    expect(bbbEnd.y).toBeGreaterThan(720);
+    expect(bloodCsfSpine.x).toBeLessThan(600);
+    expect(leptomeningealSpine.x).toBeGreaterThan(750);
+    expect(leptomeningealSpine.x - bloodCsfSpine.x).toBeGreaterThan(120);
+  });
+
+  it('maps stationary CNS objectives to named anatomical anchors', () => {
+    const paths = buildPaths('cns');
+    expect(cnsRouteAnchor(paths, 'intramedullaryCore')).toMatchObject({ lane: 0, point: { x: 590, y: 350 } });
+    expect(cnsRouteAnchor(paths, 'ventricular')).toMatchObject({ lane: 1, point: { x: 260, y: 80 } });
+    expect(cnsRouteAnchor(paths, 'basalCisternal')).toMatchObject({ lane: 1, point: { x: 550, y: 160 } });
+    expect(cnsRouteAnchor(paths, 'lumbarCistern')).toMatchObject({ lane: 2, point: { x: 690, y: 640 } });
   });
 
   it('offers one chord-safe tactical containment per wave and applies all effects', () => {
@@ -65,8 +94,13 @@ describe('Neuroaxis CNS campaign', () => {
     state.wave = 10; startWave(state);
     spawnEnemy(state, 'parenchymalCore', 0, paths);
     const core = state.enemies.find((enemy) => enemy.type === 'parenchymalCore')!;
+    expect({ x: core.x, y: core.y }).toEqual(cnsRouteAnchor(paths, 'intramedullaryCore').point);
     expect(state.enemies.filter((enemy) => enemy.type === 'sanctuaryDeposit').map((enemy) => enemy.sanctuarySite))
       .toEqual(['ventricular', 'basalCisternal', 'lumbarCistern']);
+    for (const deposit of state.enemies.filter((enemy) => enemy.type === 'sanctuaryDeposit')) {
+      const anchor = cnsRouteAnchor(paths, deposit.sanctuarySite!);
+      expect({ x: deposit.x, y: deposit.y }).toEqual(anchor.point);
+    }
     state.projectiles.push({ id: 999, x: core.x, y: core.y, targetId: core.id, speed: 1, damage: 100, unit: 'bcma', crsFactor: 1 });
     stepProjectiles(state, .01);
     expect(core.hp).toBe(core.maxHp);

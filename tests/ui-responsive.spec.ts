@@ -202,7 +202,7 @@ test('Neuroaxis keeps CNS status and containment in the iPhone top HUD', async (
   await page.getByRole('button', { name: /Neuroaxis EXPERT/ }).click();
   await page.getByRole('button', { name: 'Start Neuroaxis — Expert' }).click();
   await page.keyboard.press(' ');
-  await expect(page.getByRole('button', { name: /Contain cortical bbb entry/i })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole('button', { name: /Contain spinal barrier entry/i })).toBeVisible({ timeout: 5_000 });
   const [cnsHud, hud, stage, units, abilities] = await Promise.all([
     page.locator('.cns-hud').boundingBox(), page.locator('.hud').boundingBox(), page.locator('.stage').boundingBox(),
     page.locator('.units').boundingBox(), page.locator('.abilities').boundingBox(),
@@ -215,4 +215,34 @@ test('Neuroaxis keeps CNS status and containment in the iPhone top HUD', async (
   await expect(page.locator('.banner')).toBeHidden();
   await page.keyboard.press('r');
   await expect(page.locator('.cns-hud')).toContainText('DELAYED');
+});
+
+test('cord-only Neuroaxis anatomy remains unobstructed at every viewport', async ({ page }) => {
+  test.setTimeout(30_000);
+  const viewports = [...landscapePhones, { width: 1440, height: 900 }];
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await openMainMenu(page);
+    await page.getByRole('button', { name: /Neuroaxis EXPERT/ }).click();
+    await page.getByRole('button', { name: 'Start Neuroaxis — Expert' }).click();
+
+    const canvas = page.locator('.stage canvas');
+    await expect(canvas).toHaveAttribute('aria-label', /showing only a prominent posterior spinal cord/i);
+    await expect(page.locator('.cns-anatomy-a11y')).toContainText('Cauda equina');
+    const [stageBox, canvasBox, unitBox, abilityBox] = await Promise.all([
+      page.locator('.stage').boundingBox(), canvas.boundingBox(),
+      page.locator('.units').boundingBox(), page.locator('.abilities').boundingBox(),
+    ]);
+    expect(stageBox && canvasBox && unitBox && abilityBox).toBeTruthy();
+    expect(Math.abs(stageBox!.width / stageBox!.height - 16 / 9)).toBeLessThan(.03);
+    expect(Math.abs(canvasBox!.width - stageBox!.width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(canvasBox!.height - stageBox!.height)).toBeLessThanOrEqual(2);
+    if (viewport.width < 900) {
+      expect(unitBox!.x + unitBox!.width).toBeLessThanOrEqual(stageBox!.x + 1);
+      expect(abilityBox!.x).toBeGreaterThanOrEqual(stageBox!.x + stageBox!.width - 1);
+    } else {
+      expect(unitBox!.y).toBeGreaterThanOrEqual(stageBox!.y + stageBox!.height - 1);
+      expect(abilityBox!.y).toBeGreaterThanOrEqual(stageBox!.y + stageBox!.height - 1);
+    }
+  }
 });

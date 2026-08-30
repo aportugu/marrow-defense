@@ -86,31 +86,60 @@ function buildLiverPaths(): PathDef[] {
 }
 
 export const CNS_ROUTE_STRUCTURES = [
-  ['Cerebral microvasculature', 'blood–brain barrier', 'penetrating cortical vessel', 'perivascular space', 'periventricular white matter'],
-  ['Choroid plexus', 'lateral ventricle', 'foramen of Monro', 'third ventricle', 'cerebral aqueduct', 'fourth ventricle', 'median and lateral apertures', 'basal cisterns'],
+  ['Spinal microvasculature', 'blood–spinal cord barrier', 'penetrating vessel', 'perivascular space', 'spinal white matter'],
+  ['Choroid plexus', 'lateral ventricle', 'foramen of Monro', 'third ventricle', 'cerebral aqueduct', 'fourth ventricle', 'median and lateral apertures', 'basal cisterns', 'foramen magnum', 'spinal subarachnoid space', 'lumbar cistern'],
   ['Pial vessels', 'cerebral subarachnoid space', 'basal cisterns', 'foramen magnum', 'spinal subarachnoid space', 'lumbar cistern', 'cauda equina'],
 ] as const;
 
+export type CnsRouteAnchor =
+  | 'intramedullaryCore'
+  | 'ventricular'
+  | 'basalCisternal'
+  | 'lumbarCistern';
+
+// Named anatomical anchors keep stationary CNS objectives attached to their
+// intended structures even when the presentation geometry changes.
+const CNS_ANCHOR_POINTS: Record<CnsRouteAnchor, { lane: number; point: number }> = {
+  intramedullaryCore: { lane: 0, point: 6 },
+  ventricular: { lane: 1, point: 2 },
+  basalCisternal: { lane: 1, point: 4 },
+  lumbarCistern: { lane: 2, point: 10 },
+};
+
 function buildCnsPaths(): PathDef[] {
   return [
+    // BBB/perivascular route entering the cord from a lateral microvascular
+    // interface. The upstream cerebral origin is intentionally off-field.
     makePath([
-      { x: -50, y: 150 }, { x: 120, y: 146 }, { x: 245, y: 165 },
-      { x: 360, y: 205 }, { x: 485, y: 245 }, { x: 620, y: 280 },
-      { x: 760, y: 300 }, { x: 900, y: 330 }, { x: 1060, y: 350 }, { x: 1330, y: 378 },
+      { x: -55, y: 160 }, { x: 100, y: 150 }, { x: 260, y: 180 },
+      { x: 420, y: 210 }, { x: 580, y: 240 }, { x: 650, y: 280 },
+      { x: 590, y: 350 }, { x: 690, y: 420 }, { x: 590, y: 500 },
+      { x: 690, y: 580 }, { x: 640, y: 760 },
     ]),
+    // Blood-CSF disease arrives from an upstream cranial origin at the top of
+    // the field, then descends through the left spinal subarachnoid space.
     makePath([
-      { x: -50, y: 300 }, { x: 120, y: 292 }, { x: 260, y: 305 },
-      { x: 390, y: 325 }, { x: 500, y: 344 }, { x: 590, y: 360 },
-      { x: 680, y: 390 }, { x: 760, y: 425 }, { x: 850, y: 455 },
-      { x: 965, y: 470 }, { x: 1110, y: 492 }, { x: 1330, y: 520 },
+      { x: -55, y: 70 }, { x: 100, y: 60 }, { x: 260, y: 80 },
+      { x: 430, y: 110 }, { x: 550, y: 160 }, { x: 490, y: 250 },
+      { x: 590, y: 340 }, { x: 490, y: 430 }, { x: 590, y: 520 },
+      { x: 490, y: 610 }, { x: 520, y: 760 },
     ]),
+    // Leptomeningeal disease enters from pial vessels on the opposite side and
+    // spreads along the right spinal surface toward the cauda equina.
     makePath([
-      { x: -50, y: 82 }, { x: 130, y: 90 }, { x: 285, y: 102 },
-      { x: 455, y: 112 }, { x: 625, y: 135 }, { x: 790, y: 180 },
-      { x: 900, y: 245 }, { x: 965, y: 315 }, { x: 1015, y: 400 },
-      { x: 1060, y: 500 }, { x: 1130, y: 590 }, { x: 1330, y: 640 },
+      { x: 1335, y: 70 }, { x: 1170, y: 60 }, { x: 1000, y: 80 },
+      { x: 840, y: 110 }, { x: 730, y: 160 }, { x: 810, y: 240 },
+      { x: 690, y: 320 }, { x: 810, y: 400 }, { x: 690, y: 480 },
+      { x: 810, y: 560 }, { x: 690, y: 640 }, { x: 720, y: 760 },
     ]),
   ];
+}
+
+export function cnsRouteAnchor(paths: PathDef[], anchor: CnsRouteAnchor): { lane: number; pathPos: number; point: Vec } {
+  const definition = CNS_ANCHOR_POINTS[anchor];
+  const path = paths[definition.lane];
+  const pointIndex = Math.min(definition.point, path.points.length - 1);
+  return { lane: definition.lane, pathPos: path.cum[pointIndex], point: path.points[pointIndex] };
 }
 
 export function buildPaths(level: LevelId): PathDef[] {

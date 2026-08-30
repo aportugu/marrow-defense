@@ -1,9 +1,9 @@
 // Wave scheduling and completion. Pure; operates on GameState + the level's lanes.
-import type { AbilityId, CnsCueKind, GameState, SpawnEntry, EnemyTypeId, Meters, HepaticCueKind } from '../game/types';
+import type { AbilityId, CnsCueKind, Enemy, GameState, SpawnEntry, EnemyTypeId, Meters, HepaticCueKind } from '../game/types';
 import type { Wave } from '../data/waves';
 import { wavesForLevel, LEVELS } from '../data/levels';
 import { START, ENEMY, ECONOMY, METER, IEC_HS, CNS } from '../game/Balance';
-import { posAt, type PathDef } from '../lib/path';
+import { cnsRouteAnchor, posAt, type CnsRouteAnchor, type PathDef } from '../lib/path';
 
 const enemyCounts = () => ({
   standard: 0, proliferative: 0, highBurden: 0, bcmaLow: 0, hepaticCore: 0,
@@ -52,8 +52,12 @@ export function spawnEnemy(
   const mod = lanes[idx].mods[type];
   const hp = en.hp * mod.hp * (behavior === 'surge' ? .62 : 1);
   const path = paths[idx % paths.length];
-  const anchorFraction = type === 'sanctuaryDeposit' ? [.55, .7, .86][idx] ?? .6 : type === 'parenchymalCore' ? .48 : 0;
-  const initialPathPos = path.length * anchorFraction;
+  const semanticAnchor = s.level === 'cns' && type === 'parenchymalCore'
+    ? cnsRouteAnchor(paths, 'intramedullaryCore')
+    : s.level === 'cns' && type === 'sanctuaryDeposit'
+      ? cnsRouteAnchor(paths, idx === 2 ? 'lumbarCistern' : 'ventricular')
+      : null;
+  const initialPathPos = semanticAnchor?.pathPos ?? 0;
   const p = posAt(path, initialPathPos);
   const enemy = {
     id: s.nextId++,
@@ -86,18 +90,18 @@ export function spawnEnemy(
   }
   if (type === 'parenchymalCore') {
     enemy.speed = 0;
-    const sites = [
-      { lane: 1, fraction: .34, sanctuarySite: 'ventricular' as const },
-      { lane: 1, fraction: .7, sanctuarySite: 'basalCisternal' as const },
-      { lane: 2, fraction: .86, sanctuarySite: 'lumbarCistern' as const },
+    const sites: ReadonlyArray<{ anchor: CnsRouteAnchor; sanctuarySite: NonNullable<Enemy['sanctuarySite']> }> = [
+      { anchor: 'ventricular', sanctuarySite: 'ventricular' },
+      { anchor: 'basalCisternal', sanctuarySite: 'basalCisternal' },
+      { anchor: 'lumbarCistern', sanctuarySite: 'lumbarCistern' },
     ];
     for (const site of sites) {
-      spawnEnemy(s, 'sanctuaryDeposit', site.lane, paths, 'deposit');
+      const anchor = cnsRouteAnchor(paths, site.anchor);
+      spawnEnemy(s, 'sanctuaryDeposit', anchor.lane, paths, 'deposit');
       const deposit = s.enemies.at(-1)!;
       deposit.sanctuarySite = site.sanctuarySite;
-      deposit.pathPos = paths[site.lane].length * site.fraction;
-      const position = posAt(paths[site.lane], deposit.pathPos);
-      deposit.x = position.x; deposit.y = position.y;
+      deposit.pathPos = anchor.pathPos;
+      deposit.x = anchor.point.x; deposit.y = anchor.point.y;
     }
     emitCnsCue(s, 'deposit', idx);
   }
