@@ -36,8 +36,13 @@ describe('WaveSystem', () => {
     const scheduled = LIVER_WAVES.reduce((total, wave) => total + expandWave(wave).length, 0);
     const flareSpawns = LIVER_WAVES.reduce((total, wave) =>
       total + (wave.events ?? []).reduce((count, event) => count + event.count, 0), 0);
-    expect(scheduled).toBe(178);
+    expect(WAVES.reduce((total, wave) => total + expandWave(wave).length, 0)).toBe(287);
+    expect(scheduled).toBe(183);
     expect(flareSpawns).toBe(27);
+    expect(LIVER_WAVES.slice(0, 5).map((wave) =>
+      wave.groups.find((group) => group.behavior === 'surge')?.count)).toEqual([1, 1, 1, 1, 1]);
+    expect(LIVER_WAVES.slice(5).map((wave) =>
+      wave.groups.find((group) => group.behavior === 'surge')?.count)).toEqual([3, 3, 3, 3, 3]);
     expect(LIVER_WAVES.every((wave) => new Set(wave.groups.map((group) => group.lane)).size === 3)).toBe(true);
     expect(LIVER_WAVES.every((wave) => wave.groups.some((group) => group.behavior === 'surge'))).toBe(true);
     expect(LEVELS.liver.scoreKillTarget).toBeGreaterThan(scheduled + flareSpawns);

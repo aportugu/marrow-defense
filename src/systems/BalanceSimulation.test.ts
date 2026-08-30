@@ -103,7 +103,7 @@ function runHepaticMixed(): GameState {
       } else if (tower) actionIndex++;
     }
     if (s.meters.crs >= 58 && canActivate(s, 'toci')) activate(s, 'toci');
-    if (s.meters.neuro >= 66 && canActivate(s, 'dexa')) activate(s, 'dexa');
+    if (s.stats.dexaUses < 1 && s.meters.neuro >= 85 && canActivate(s, 'dexa')) activate(s, 'dexa');
     if (s.meters.hematotoxicity >= 58 && canActivate(s, 'stemcell')) activate(s, 'stemcell');
     else if (s.stats.gcsfUses < 8 && s.meters.hematotoxicity >= 45 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
     tickLiver(s, .05);
@@ -192,6 +192,7 @@ describe('full-run balance', () => {
     expect(s.phase, JSON.stringify({ wave: s.wave, meters: s.meters, stats: s.stats, towers: s.towers.length })).toBe('won');
     expect(s.stats.killsByType.hepaticCore).toBe(1);
     expect(s.bossEscaped).toBe(false);
+    expect(s.meters.fitness).toBeGreaterThan(0);
     expect(s.stats.peakCrs).toBeLessThan(95);
     expect(s.stats.peakNeuro).toBeLessThan(95);
   });
