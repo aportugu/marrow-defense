@@ -116,6 +116,54 @@ for (const viewport of landscapePhones) {
   });
 }
 
+test('portrait tablet uses compact campaign rows without splitting labels', async ({ page }) => {
+  const viewport = { width: 870, height: 1194 };
+  await page.setViewportSize(viewport);
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('marrow-defense:highscore', '759');
+    localStorage.setItem('marrow-defense:progress', JSON.stringify({
+      cleared: { marrow: true, liver: true, cns: true },
+      best: {
+        marrow: { score: 625, response: 'VGPR' },
+        liver: { score: 660, response: 'VGPR' },
+        cns: { score: 482, response: 'SD' },
+      },
+    }));
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Enter' }).click();
+
+  const menu = page.locator('.start-card');
+  const cards = menu.locator('.level-card');
+  await expect(cards).toHaveCount(3);
+  const cardBoxes = await cards.evaluateAll((nodes) => nodes.map((node) => {
+    const box = node.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  }));
+  expect(new Set(cardBoxes.map(({ x }) => Math.round(x))).size).toBe(1);
+  expect(cardBoxes[1].y).toBeGreaterThan(cardBoxes[0].y + cardBoxes[0].height - 1);
+  expect(cardBoxes[2].y).toBeGreaterThan(cardBoxes[1].y + cardBoxes[1].height - 1);
+
+  const compactLabels = menu.locator('.lc-name, .lc-difficulty, .lc-best, .lc-state');
+  for (let index = 0; index < await compactLabels.count(); index += 1) {
+    const label = compactLabels.nth(index);
+    await expect(label).toHaveCSS('white-space', 'nowrap');
+    const fits = await label.evaluate((node) => node.scrollWidth <= node.clientWidth + 1);
+    expect(fits).toBe(true);
+  }
+  await expect(menu.locator('.lc-name')).toHaveText(['Marrow', 'Hepatic', 'Neuroaxis']);
+
+  const menuBox = await menu.boundingBox();
+  expect(menuBox).not.toBeNull();
+  expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+  const actions = menu.locator('.menu-actions .btn');
+  for (let index = 0; index < await actions.count(); index += 1) await expect(actions.nth(index)).toBeInViewport();
+});
+
 test('portrait phone displays the rotation guard', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');

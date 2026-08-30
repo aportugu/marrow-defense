@@ -29,6 +29,8 @@
   width: min(560px, 92%);
   max-height: 92%;
   overflow-y: auto;
+  overflow-wrap: normal;
+  word-break: normal;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -142,14 +144,12 @@
 
 .level-card:hover { transform: translateY(-2px); background: rgba(255,255,255,.09); }
 .level-card:focus-visible { outline: 2px solid white; outline-offset: 3px; }
-.level-card .lc-head, .level-card .lc-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.level-card .lc-head { flex-wrap: wrap; }
-.level-card .lc-name { overflow-wrap: anywhere; }
-.level-card .lc-name { font-size: 19px; font-weight: 850; letter-spacing: 0.05em; }
-.level-card .lc-difficulty { width: max-content; padding: 3px 7px; border-radius: 99px; color: var(--cyan-soft); background: rgba(34,211,238,.14); font-size: 9px; font-weight: 900; letter-spacing: .12em; }
+.level-card .lc-head, .level-card .lc-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.level-card .lc-name { font-size: 19px; font-weight: 850; letter-spacing: 0.05em; white-space: nowrap; }
+.level-card .lc-difficulty { width: max-content; padding: 3px 7px; border-radius: 99px; color: var(--cyan-soft); background: rgba(34,211,238,.14); font-size: 9px; font-weight: 900; letter-spacing: .12em; white-space: nowrap; }
 .level-card .lc-footer { margin-top: auto; padding-top: 5px; border-top: 1px solid rgba(255,255,255,.08); }
-.level-card .lc-best { font-size: 11px; color: #fde68a; }
-.level-card .lc-state { color: #c4b5fd; font-size: 9px; font-weight: 900; letter-spacing: .12em; }
+.level-card .lc-best { font-size: 11px; color: #fde68a; white-space: nowrap; }
+.level-card .lc-state { color: #c4b5fd; font-size: 9px; font-weight: 900; letter-spacing: .12em; white-space: nowrap; }
 .level-card.selected { border-color: rgba(176, 67, 214, 0.92); background: rgba(176,67,214,.12); box-shadow: 0 0 22px rgba(176, 67, 214, 0.24), inset 3px 0 0 var(--violet); }
 .level-card.advanced { border-color: rgba(245,158,11,.42); background: linear-gradient(145deg, rgba(245,158,11,.1), rgba(192,38,211,.06)); }
 .level-card.advanced .lc-difficulty { color: #fde68a; background: rgba(245,158,11,.18); }

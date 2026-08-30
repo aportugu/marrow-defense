@@ -428,6 +428,60 @@
 
 }
 
+/* Tall tablet and compact desktop windows use full-width campaign rows. This
+   keeps names, difficulty, scores, and selection state intact as atomic labels. */
+@media (orientation: portrait) and (min-width: 501px) and (max-width: 900px) {
+  .opening-menu .menu.menu-start:not(.menu-entry) {
+    justify-content: center;
+    padding: 20px;
+    background: rgba(8, 2, 6, .8);
+    backdrop-filter: blur(2px);
+  }
+
+  .opening-menu .menu-card.start-card {
+    width: min(720px, calc(100vw - 40px));
+    max-height: calc(100dvh - 40px);
+    padding: 20px 24px;
+  }
+
+  .opening-menu .start-card .level-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .opening-menu .start-card .level-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 64px;
+    padding: 10px 14px;
+    gap: 16px;
+  }
+
+  .opening-menu .start-card .lc-head,
+  .opening-menu .start-card .lc-footer {
+    flex-wrap: nowrap;
+  }
+
+  .opening-menu .start-card .lc-head {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .opening-menu .start-card .lc-footer {
+    justify-content: flex-end;
+    margin: 0;
+    padding: 0 0 0 16px;
+    border-top: 0;
+    border-left: 1px solid rgba(255,255,255,.08);
+  }
+
+  .opening-menu .start-card .lc-name { font-size: clamp(17px, 2.8vw, 21px); }
+  .opening-menu .start-card .lc-difficulty { font-size: 8px; }
+  .opening-menu .start-card .lc-best { font-size: 10px; }
+  .opening-menu .start-card .lc-state { font-size: 8px; }
+}
+
 @media (orientation: portrait) and (max-width: 500px) {
   html,
   body { overflow: hidden; }
