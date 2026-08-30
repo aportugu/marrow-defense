@@ -103,9 +103,23 @@ export class StageView {
     if (key !== this.lastNoticeKey) { this.lastNoticeKey = key; this.notice.textContent = current.text; this.notice.className = `notice level-${current.level}`; }
   }
 
+  private guidedHint(state: GameState): string {
+    if (!state.onboarding.active || !state.onboarding.hint) return '';
+    const hints = {
+      chooseUnit: ['1/4 · CHOOSE A UNIT', 'Select an affordable defender from the unit rail.', 'Choose a unit'],
+      placeUnit: ['2/4 · PLACE IT', 'Tap a highlighted legal space away from paths and other units.', 'Place in the highlighted area'],
+      startWave: ['3/4 · START THE WAVE', 'Review the incoming cells, then launch the wave when ready.', 'Start the wave'],
+      monitorWave: ['4/4 · MONITOR AND TREAT', 'Units fire automatically. Use Tocilizumab for CRS, Dexamethasone for neurotoxicity, and marrow support for hematotoxicity.', 'Watch meters and match treatment'],
+    } as const;
+    const [title, detail, mobile] = hints[state.onboarding.hint];
+    return `<div class="guided-hint"><b>${title}</b><span class="guided-detail">${detail}</span><span class="guided-mobile">${mobile}</span></div>`;
+  }
+
   private updateBanner(state: GameState): void {
     if (state.phase !== 'playing') { this.banner.classList.add('hidden'); this.lastBannerKey = ''; return; }
     this.banner.classList.remove('hidden');
+    this.banner.classList.toggle('guided', state.onboarding.active);
+    const guidedHint = this.guidedHint(state);
     if (state.subPhase === 'planning' && state.wave <= state.wavesTotal) {
       const seconds = Math.max(0, Math.ceil(state.countdown));
       const key = `${state.level}-p${state.wave}-${seconds}-${state.lastWaveReport?.wave ?? 0}-${state.onboarding.hint ?? ''}`;
@@ -119,7 +133,7 @@ export class StageView {
       const title = WAVE_TITLES[state.level][state.wave];
       const hint = state.onboarding.active && state.onboarding.hint === 'placeUnit' ? '<div class="placement-hint">LEGAL PLACEMENT SPACE HIGHLIGHTED</div>' : '';
       const briefing = state.level === 'liver' && state.wave === 1 ? '<div class="hepatic-briefing"><b>CLEAR INVADING PLASMA-CELL CLUSTERS FROM THE LIVER</b><span>PORTAL VEIN · HEPATIC ARTERY · BILIARY BRANCH</span></div>' : '';
-      this.banner.innerHTML = `${report}${briefing}<div class="b-line">WAVE ${state.wave}${title ? ` · ${title}` : ''} IN <b>${seconds}s</b></div><div class="b-chips">${chips}${special}</div>${hint}<button class="btn small${state.onboarding.hint === 'startWave' ? ' hint' : ''}">Start now</button>`;
+      this.banner.innerHTML = `${guidedHint}${report}${briefing}<div class="b-line">WAVE ${state.wave}${title ? ` · ${title}` : ''} IN <b>${seconds}s</b></div><div class="b-chips">${chips}${special}</div>${hint}<button class="btn small${state.onboarding.hint === 'startWave' ? ' hint' : ''}">Start now</button>`;
       this.banner.querySelector<HTMLButtonElement>('.btn.small')!.addEventListener('click', () => this.game.startWaveNow());
       return;
     }
@@ -128,7 +142,7 @@ export class StageView {
     if (key === this.lastBannerKey) return;
     this.lastBannerKey = key; const title = WAVE_TITLES[state.level][state.wave];
     const eventLabel = event ? `<div class="hepatic-event ${event.stage}"><b>${event.stage === 'warning' ? 'PLASMA-CELL SURGE' : 'SURGE ACTIVE'} — ${LEVELS.liver.lanes[event.lane].name.toUpperCase()}</b>${event.stage === 'warning' ? `<span>IMPACT IN ${seconds}s</span>` : ''}</div>` : '';
-    this.banner.innerHTML = `${eventLabel}<div class="b-line big">WAVE ${Math.min(state.wave, state.wavesTotal)}${title ? ` · ${title}` : ''}</div>`;
+    this.banner.innerHTML = `${guidedHint}${eventLabel}<div class="b-line big">WAVE ${Math.min(state.wave, state.wavesTotal)}${title ? ` · ${title}` : ''}</div>`;
   }
 
   private placePopup(x: number, y: number): void {

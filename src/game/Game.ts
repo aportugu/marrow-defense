@@ -190,13 +190,17 @@ export class Game {
     this.syncHepaticCue();
     if (subPhaseBefore === 'planning' && s.subPhase === 'wave') {
       if (s.onboarding.active) {
-        s.onboarding.active = false;
-        s.onboarding.hint = null;
-        this.markTutorialSeen();
+        s.onboarding.hint = 'monitorWave';
       }
       this.kinetic.pushEvent('waveStart', this.visualTime);
       this.music.trigger('waveStart');
     } else if (subPhaseBefore === 'wave' && s.subPhase === 'planning') {
+      if (s.onboarding.active) {
+        s.onboarding.active = false;
+        s.onboarding.hint = null;
+        this.markTutorialSeen();
+        this.cb.onNotice?.({ text: 'Guided wave complete — keep adapting your defense', level: 'info' });
+      }
       this.kinetic.pushEvent('waveClear', this.visualTime);
       this.music.trigger('waveClear');
       this.sound.clear();
@@ -395,9 +399,7 @@ export class Game {
       return;
     startWave(s);
     if (s.onboarding.active) {
-      s.onboarding.active = false;
-      s.onboarding.hint = null;
-      this.markTutorialSeen();
+      s.onboarding.hint = 'monitorWave';
     }
     this.kinetic.pushEvent('waveStart', this.visualTime);
     this.punch(5);

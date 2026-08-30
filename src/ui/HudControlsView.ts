@@ -148,7 +148,8 @@ export class HudControlsView {
       const can = canActivate(state, id); const live = state.phase === 'playing';
       control.btn.disabled = !live; control.btn.classList.toggle('ready', can); control.btn.classList.toggle('poor', live && !can);
       const remaining = Math.max(0, state.gcsfUntil - state.stats.time);
-      const concerning = (id === 'toci' && state.meters.crs >= METER.crsWarn) || (id === 'dexa' && (state.meters.neuro >= METER.neuroWarn || state.meters.hyperinflammation >= 55)) || (id === 'stemcell' && hematotoxicity >= METER.hematotoxicityWarn) || (id === 'gcsf' && hematotoxicity >= GCSF.minHematotoxicity) || (id === 'anakinra' && state.iecHsActive);
+      const guidedMonitoring = state.onboarding.active && state.onboarding.hint === 'monitorWave';
+      const concerning = (id === 'toci' && (state.meters.crs >= METER.crsWarn || (guidedMonitoring && state.meters.crs > 0))) || (id === 'dexa' && (state.meters.neuro >= METER.neuroWarn || state.meters.hyperinflammation >= 55 || (guidedMonitoring && state.meters.neuro > 0))) || (id === 'stemcell' && hematotoxicity >= METER.hematotoxicityWarn) || (id === 'gcsf' && hematotoxicity >= GCSF.minHematotoxicity) || (id === 'anakinra' && state.iecHsActive);
       control.btn.classList.toggle('hint', can && concerning);
       control.state.textContent = id === 'anakinra' && !state.iecHsUnlocked ? 'locked' : id === 'gcsf' && remaining > 0 ? `support ${Math.ceil(remaining)}s` : id === 'gcsf' && hematotoxicity < GCSF.minHematotoxicity ? `HEM ${GCSF.minHematotoxicity}+` : def.once && ability.used ? 'used' : ability.cooldown > 0 ? `${Math.ceil(ability.cooldown)}s` : def.cost === 0 ? 'ready' : `${def.cost}`;
       if (ability.cooldown > 0) this.abilityWasCooling[id] = true;

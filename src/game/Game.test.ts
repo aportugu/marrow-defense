@@ -27,6 +27,8 @@ function entryGame(reducedMotion = false): Game {
       startLevel: vi.fn(),
     },
     sound: { ensure: vi.fn(), wave: vi.fn() },
+    kinetic: { pushEvent: vi.fn() },
+    shake: 0,
     progress: { cleared: { marrow: false, liver: false }, best: { marrow: null, liver: null } },
     visualTime: 23,
     introStartedAt: 0,
@@ -65,5 +67,20 @@ describe('menu entry gate', () => {
     expect(game.state.level).toBe('liver');
     expect(game.state.currency).toBe(220);
     expect(game.music.startLevel).toHaveBeenCalledWith('liver');
+  });
+
+  it('keeps guided onboarding active through the first wave', () => {
+    const game = entryGame();
+    game.begin('marrow', true);
+    expect(game.state.onboarding).toEqual({ active: true, hint: 'chooseUnit' });
+
+    game.setBuildType('bcma');
+    expect(game.state.onboarding.hint).toBe('placeUnit');
+    game.state.onboarding.hint = 'startWave';
+    game.startWaveNow();
+
+    expect(game.state.subPhase).toBe('wave');
+    expect(game.state.onboarding).toEqual({ active: true, hint: 'monitorWave' });
+    expect(game.settings.tutorialSeen).toBe(false);
   });
 });

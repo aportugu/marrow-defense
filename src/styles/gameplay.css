@@ -176,6 +176,21 @@ input:focus-visible {
   text-align: center;
 }
 
+.guided-hint {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(134, 239, 172, .3);
+  color: #bbf7d0;
+  text-align: center;
+}
+
+.guided-hint b { font-size: 11px; letter-spacing: .12em; }
+.guided-detail { color: #dcfce7; font-size: 10px; line-height: 1.3; }
+.guided-mobile { display: none; }
+
 .notice {
   position: absolute;
   left: 50%;
@@ -363,4 +378,3 @@ input:focus-visible {
 .unit.u-bcma .u-name { color: var(--cyan-soft); }
 .unit.u-dual .u-name { color: var(--violet-soft); }
 .unit.u-memory .u-name { color: var(--green); }
-

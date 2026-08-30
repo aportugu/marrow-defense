@@ -9,7 +9,7 @@ export const CANVAS_H = 720;
 export type EnemyTypeId = 'standard' | 'proliferative' | 'highBurden' | 'bcmaLow' | 'hepaticCore';
 export type UnitTypeId = 'bcma' | 'dual' | 'memory';
 export type AbilityId = 'toci' | 'dexa' | 'stemcell' | 'anakinra' | 'gcsf';
-export type HintId = 'chooseUnit' | 'placeUnit' | 'startWave';
+export type HintId = 'chooseUnit' | 'placeUnit' | 'startWave' | 'monitorWave';
 
 export type GamePhase = 'menu' | 'playing' | 'paused' | 'won' | 'lost';
 export type SubPhase = 'planning' | 'wave';

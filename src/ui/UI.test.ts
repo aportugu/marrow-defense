@@ -421,6 +421,32 @@ describe('UI', () => {
     expect(document.querySelector('.menu:not(.hidden)')).toBeNull();
   });
 
+  it('provides four contextual guided-run steps and treatment highlights', () => {
+    const { game, state } = setup();
+    state.onboarding = { active: true, hint: 'chooseUnit' };
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('1/4 · CHOOSE A UNIT');
+
+    state.onboarding.hint = 'placeUnit';
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('2/4 · PLACE IT');
+
+    state.onboarding.hint = 'startWave';
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('3/4 · START THE WAVE');
+
+    state.subPhase = 'wave';
+    state.onboarding.hint = 'monitorWave';
+    state.meters.crs = 10;
+    state.meters.neuro = 8;
+    game.cb.onSync?.(state);
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('4/4 · MONITOR AND TREAT');
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('Tocilizumab for CRS');
+    expect(document.querySelector('.guided-hint')?.textContent).toContain('Dexamethasone for neurotoxicity');
+    expect(document.querySelector('.a-toci')?.classList.contains('hint')).toBe(true);
+    expect(document.querySelector('.a-dexa')?.classList.contains('hint')).toBe(true);
+  });
+
   it('shows hematotoxicity direction, ICAHT pressure, and Stem-Cell recovery status', () => {
     const { game, state } = setup();
     state.currency = 300;

@@ -168,6 +168,13 @@
   }
   .banner .hepatic-briefing,
   .banner .wave-report { display: none; }
+  .banner.guided .b-line,
+  .banner.guided .b-chips,
+  .banner.guided .hepatic-event { display: none; }
+  .guided-hint { gap: 1px; padding: 0; border: 0; }
+  .guided-hint b { font-size: 7px; letter-spacing: .07em; white-space: nowrap; }
+  .guided-detail { display: none; }
+  .guided-mobile { display: block; color: #dcfce7; font-size: 7px; line-height: 1.1; }
   .b-line { flex: 1 1 auto; font-size: 8px; line-height: 1.15; }
   .b-line.big { font-size: 10px; letter-spacing: .1em; }
   .b-chips { gap: 2px; }

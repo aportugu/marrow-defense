@@ -66,12 +66,11 @@ for (const viewport of landscapePhones) {
       if (await next.isVisible()) await next.click();
     }
     await expect(tutorial).toContainText('not medical advice');
-    await expect(page.getByRole('button', { name: 'Start Guided Marrow Run' })).toBeInViewport();
-    await page.getByRole('button', { name: 'Back to menu' }).click();
-    await expect(page.locator('.start-card:not(.tutorial-card)')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Start Marrow' }).click();
+    const guidedStart = page.getByRole('button', { name: 'Start Guided Marrow Run' });
+    await expect(guidedStart).toBeInViewport();
+    await guidedStart.click();
     await expect(page.locator('.menu')).toHaveClass(/hidden/);
+    await expect(page.locator('.guided-hint')).toContainText('1/4 · CHOOSE A UNIT');
     const [gameStage, canvas, units, abilities, hud, banner] = await Promise.all([
       page.locator('.stage').boundingBox(), page.locator('.stage canvas').boundingBox(),
       page.locator('.units').boundingBox(), page.locator('.abilities').boundingBox(),
