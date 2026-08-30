@@ -93,6 +93,20 @@
   .hud-mid { min-width: 58px; }
   .currency { font-size: 14px; }
   .wave { font-size: 9px; }
+  .cns-hud {
+    position: fixed;
+    top: max(3px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 26;
+    width: min(390px, 46vw);
+    margin: 0;
+    transform: translateX(-50%);
+  }
+  .cns-burden-title { font-size: 7px; }
+  .cns-burden-track { height: 3px; margin: 1px 0; }
+  .cns-contain { min-height: 30px; padding: 2px 4px; font-size: 6px; }
+  .cns-contain b { font-size: 6px; }
+  .cns-quiet { font-size: 7px; }
   .hud-right { display: flex; gap: 4px; }
   .icon-btn { min-width: 44px; min-height: 44px; padding: 5px 8px; }
 
@@ -167,6 +181,7 @@
     flex-wrap: nowrap;
   }
   .banner .hepatic-briefing,
+  .banner .cns-briefing,
   .banner .wave-report { display: none; }
   .banner.guided .b-line,
   .banner.guided .b-chips,
@@ -180,6 +195,8 @@
   .b-chips { gap: 2px; }
   .chip { padding: 1px 4px; font-size: 7px; white-space: nowrap; }
   .hepatic-event { gap: 4px; margin: 0; padding: 2px 4px; font-size: 7px; }
+  .banner .cns-event { display: none; }
+  .screen:has(.cns-hud:not(.hidden)) .banner { display: none; }
   .banner .btn.small { min-height: 36px; padding: 4px 7px; font-size: 9px; }
 
   /* On phones, transient status sits at the bottom-center of the play column,
@@ -304,6 +321,21 @@
     max-height: calc(100dvh - 20px);
     padding: 8px 10px;
   }
+  .opening-menu .menu-card.atlas-card {
+    width: min(400px, var(--phone-menu-width));
+    max-height: calc(100dvh - 20px);
+    padding: 8px 10px;
+  }
+  .atlas-card h1 { margin-bottom: 3px; font-size: 15px; letter-spacing: .04em; }
+  .atlas-summary { margin-bottom: 4px; font-size: 8px; line-height: 1.2; }
+  .atlas-item { margin-bottom: 3px; padding: 4px 6px; }
+  .atlas-item h2, .atlas-references h2 { font-size: 8px; }
+  .atlas-item p { font-size: 7px; line-height: 1.2; }
+  .atlas-references { padding: 4px 6px; gap: 1px; }
+  .atlas-references a { font-size: 7px; }
+  .atlas-card .education-disclaimer { margin: 3px 0; font-size: 7px; }
+  .atlas-card .menu-actions { gap: 4px; margin-top: 4px; }
+  .atlas-card .menu-actions .btn { min-height: 32px; padding: 4px; font-size: 8px; }
 
   .tutorial-card .menu-kicker { margin: 0 0 2px; font-size: 7px; }
   .tutorial-card h1 { margin-bottom: 3px; font-size: 17px; letter-spacing: .05em; }
@@ -329,16 +361,27 @@
   .opening-menu .start-card .tag { margin-bottom: 6px; font-size: 10px; line-height: 1.25; }
   .opening-menu .start-card .hs { margin-bottom: 7px; padding: 2px 7px; font-size: 8px; }
   .opening-menu .start-card .level-row { gap: 7px; margin-bottom: 5px; }
-  .opening-menu .start-card .level-card { min-height: 108px; gap: 3px; padding: 8px 9px; }
+  .opening-menu .start-card .level-card { min-height: 92px; gap: 2px; padding: 6px 7px; }
   .opening-menu .start-card .lc-name { font-size: 14px; }
   .opening-menu .start-card .lc-difficulty { font-size: 7px; padding: 2px 5px; }
   .opening-menu .start-card .lc-tag { min-height: 23px; font-size: 8px; }
+  .opening-menu .start-card .lc-tag,
+  .opening-menu .start-card .lc-summary {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .opening-menu .start-card .lc-tag { min-height: 0; max-height: 20px; }
+  .opening-menu .start-card .lc-summary { max-height: 17px; line-height: 1.15; }
   .opening-menu .start-card .lc-summary,
   .opening-menu .start-card .lc-recommended,
   .opening-menu .start-card .lc-best,
   .opening-menu .start-card .lc-state { font-size: 7px; }
-  .opening-menu .start-card .menu-actions { align-items: stretch; margin-top: 5px; gap: 5px; }
-  .opening-menu .start-card .menu-actions .btn { min-width: min(240px, 100%); }
+  .opening-menu .start-card .menu-actions { align-items: stretch; margin-top: 4px; gap: 3px; }
+  .opening-menu .start-card .menu-actions .btn { min-width: 0; min-height: 34px; padding-block: 4px; }
+  .opening-menu .start-card .menu-actions .btn:first-child { min-height: 38px; }
   .opening-menu .start-card .menu-actions .btn[data-mobile-label] { font-size: 0; }
   .opening-menu .start-card .menu-actions .btn[data-mobile-label]::before {
     content: attr(data-mobile-label);
@@ -363,10 +406,11 @@
   .opening-menu .start-card .tag { margin-bottom: 3px; font-size: 8px; line-height: 1.15; }
   .opening-menu .start-card .hs { margin-bottom: 4px; padding: 1px 6px; font-size: 7px; }
   .opening-menu .start-card .level-row { gap: 5px; margin-bottom: 3px; }
-  .opening-menu .start-card .level-card { min-height: 86px; gap: 2px; padding: 5px 6px; }
+  .opening-menu .start-card .level-card { min-height: 76px; gap: 1px; padding: 4px 5px; }
   .opening-menu .start-card .lc-name { font-size: 12px; }
   .opening-menu .start-card .lc-difficulty { font-size: 6px; padding: 1px 4px; }
   .opening-menu .start-card .lc-tag { min-height: 18px; font-size: 7px; line-height: 1.2; }
+  .opening-menu .start-card .lc-tag { min-height: 0; max-height: 17px; }
   .opening-menu .start-card .lc-summary,
   .opening-menu .start-card .lc-recommended,
   .opening-menu .start-card .lc-best,

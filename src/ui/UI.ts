@@ -43,6 +43,11 @@ export class UI {
         if (state.phase === 'playing' && state.subPhase === 'planning') { event.preventDefault(); this.game.startWaveNow(); }
       } else if (event.key === 'p' || event.key === 'P') {
         if (state.phase === 'playing' || state.phase === 'paused') this.game.togglePause();
+      } else if (event.key === 'r' || event.key === 'R') {
+        const breach = [...state.activeCnsBreaches]
+          .filter((candidate) => candidate.stage === 'warning')
+          .sort((a, b) => a.remaining - b.remaining)[0];
+        if (breach) this.game.containCnsBreach(breach.id);
       } else if (event.key === '1') this.game.useAbility('toci');
       else if (event.key === '2') this.game.useAbility('dexa');
       else if (event.key === '3') this.game.useAbility('anakinra');

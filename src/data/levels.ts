@@ -3,7 +3,7 @@
 // converging lanes (portal vein, hepatic artery, biliary branch) and scales
 // each enemy type per lane so the same units face distinct pressure per lane.
 import type { EnemyTypeId, LevelId } from '../game/types';
-import { WAVES, LIVER_WAVES, type Wave } from './waves';
+import { WAVES, LIVER_WAVES, CNS_WAVES, type Wave } from './waves';
 
 export interface LaneMod {
   hp: number;
@@ -22,7 +22,7 @@ export interface LevelDef {
   id: LevelId;
   name: string;
   tagline: string;
-  difficulty: 'STANDARD' | 'ADVANCED';
+  difficulty: 'STANDARD' | 'ADVANCED' | 'EXPERT';
   difficultySummary: string;
   recommendedText: string;
   startCurrency: number;
@@ -38,6 +38,11 @@ const NEUTRAL: Record<EnemyTypeId, LaneMod> = {
   highBurden: { hp: 1, speed: 1, reward: 1 },
   bcmaLow: { hp: 1, speed: 1, reward: 1 },
   hepaticCore: { hp: 1, speed: 1, reward: 1 },
+  cnsDrifter: { hp: 1, speed: 1, reward: 1 },
+  leptomeningealSeed: { hp: 1, speed: 1, reward: 1 },
+  sanctuaryClone: { hp: 1, speed: 1, reward: 1 },
+  sanctuaryDeposit: { hp: 1, speed: 1, reward: 1 },
+  parenchymalCore: { hp: 1, speed: 1, reward: 1 },
 };
 
 const mods = (
@@ -46,7 +51,7 @@ const mods = (
   highBurden: LaneMod,
   bcmaLow: LaneMod,
   hepaticCore: LaneMod = { hp: 1, speed: 1, reward: 1 },
-): Record<EnemyTypeId, LaneMod> => ({ standard, proliferative, highBurden, bcmaLow, hepaticCore });
+): Record<EnemyTypeId, LaneMod> => ({ ...NEUTRAL, standard, proliferative, highBurden, bcmaLow, hepaticCore });
 
 export const LEVELS: Record<LevelId, LevelDef> = {
   marrow: {
@@ -112,9 +117,35 @@ export const LEVELS: Record<LevelId, LevelDef> = {
       },
     ],
   },
+  cns: {
+    id: 'cns',
+    name: 'Neuroaxis',
+    tagline: 'Hybrid CNS myeloma relapse across barriers, CSF, and parenchyma',
+    difficulty: 'EXPERT',
+    difficultySummary: '3 CNS INTERFACES · DYNAMIC BREACHES',
+    recommendedText: 'Highest complexity',
+    startCurrency: 260,
+    scoreKillTarget: 225,
+    scoreTimeTarget: 720,
+    waves: CNS_WAVES,
+    lanes: [
+      {
+        name: 'Cerebral microvasculature', color: '#fb7185', label: 'BBB · perivascular route',
+        mods: { ...NEUTRAL, cnsDrifter: { hp: .95, speed: 1.05, reward: 1.1 }, sanctuaryClone: { hp: 1.1, speed: 1, reward: 1.15 }, parenchymalCore: { hp: 1, speed: 1, reward: 1 } },
+      },
+      {
+        name: 'Choroid plexus', color: '#38bdf8', label: 'Blood–CSF · ventricular route',
+        mods: { ...NEUTRAL, cnsDrifter: { hp: .9, speed: 1.18, reward: 1.1 }, sanctuaryClone: { hp: 1, speed: 1.05, reward: 1.15 } },
+      },
+      {
+        name: 'Pial vessels', color: '#a78bfa', label: 'Leptomeningeal · craniospinal route',
+        mods: { ...NEUTRAL, cnsDrifter: { hp: 1, speed: 1.1, reward: 1.15 }, leptomeningealSeed: { hp: 1.08, speed: .95, reward: 1.2 }, sanctuaryClone: { hp: 1.08, speed: 1, reward: 1.2 } },
+      },
+    ],
+  },
 };
 
-export const LEVEL_ORDER: LevelId[] = ['marrow', 'liver'];
+export const LEVEL_ORDER: LevelId[] = ['marrow', 'liver', 'cns'];
 
 export function wavesForLevel(level: LevelId): Wave[] {
   return LEVELS[level].waves;

@@ -78,12 +78,14 @@ export function stepMeters(s: GameState, dt: number): void {
   if (m.neuro > s.stats.peakNeuro) s.stats.peakNeuro = m.neuro;
   if (m.hyperinflammation > s.stats.peakHyperinflammation) s.stats.peakHyperinflammation = m.hyperinflammation;
   if (m.hematotoxicity > s.stats.peakHematotoxicity) s.stats.peakHematotoxicity = m.hematotoxicity;
+  if (m.cnsBurden > s.stats.peakCnsBurden) s.stats.peakCnsBurden = m.cnsBurden;
   if (m.fitness < s.stats.lowestFitness) s.stats.lowestFitness = m.fitness;
   if (s.waveBaseline) {
     s.waveBaseline.peakCrs = Math.max(s.waveBaseline.peakCrs, m.crs);
     s.waveBaseline.peakNeuro = Math.max(s.waveBaseline.peakNeuro, m.neuro);
     s.waveBaseline.peakHyperinflammation = Math.max(s.waveBaseline.peakHyperinflammation, m.hyperinflammation);
     s.waveBaseline.peakHematotoxicity = Math.max(s.waveBaseline.peakHematotoxicity, m.hematotoxicity);
+    s.waveBaseline.peakCnsBurden = Math.max(s.waveBaseline.peakCnsBurden, m.cnsBurden);
   }
   if (s.phase === 'playing') s.stats.time += dt;
 }
@@ -92,7 +94,7 @@ export function checkEnd(s: GameState): 'won' | 'lost' | null {
   if (s.phase !== 'playing') return null;
   if (s.bossEscaped) return 'lost';
   const m = s.meters;
-  if (m.crs >= 100 || m.neuro >= 100 || m.hyperinflammation >= 100 || m.fitness <= 0) return 'lost';
+  if (m.crs >= 100 || m.neuro >= 100 || m.hyperinflammation >= 100 || m.cnsBurden >= 100 || m.fitness <= 0) return 'lost';
   if (s.wave > s.wavesTotal) return 'won';
   return null;
 }

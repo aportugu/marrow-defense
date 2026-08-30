@@ -65,7 +65,7 @@ describe('ScoringSystem', () => {
 
   it('awards sCR for an excellent run', () => {
     const s = fresh();
-    s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
+    s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0, cnsBurden: 0 };
     s.stats.peakCrs = 0;
     s.stats.lowestFitness = 100;
     s.stats.kills = 60;
@@ -79,7 +79,7 @@ describe('ScoringSystem', () => {
 
   it('caps a high-scoring non-progression loss at SD', () => {
     const s = fresh();
-    s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
+    s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0, cnsBurden: 0 };
     s.stats.peakCrs = 0;
     s.stats.lowestFitness = 100;
     s.stats.kills = 60;
@@ -91,7 +91,7 @@ describe('ScoringSystem', () => {
 
   it('assigns PD when the hepatic core escapes regardless of score', () => {
     const s = fresh();
-    s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
+    s.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0, cnsBurden: 0 };
     s.stats.peakCrs = 0;
     s.stats.lowestFitness = 100;
     s.stats.kills = 999;
@@ -104,7 +104,7 @@ describe('ScoringSystem', () => {
 
   it('scores a collapsed body at zero', () => {
     const s = fresh();
-    s.meters = { burden: 100, crs: 100, neuro: 100, fitness: 0, hematotoxicity: 100, hyperinflammation: 100 };
+    s.meters = { burden: 100, crs: 100, neuro: 100, fitness: 0, hematotoxicity: 100, hyperinflammation: 100, cnsBurden: 100 };
     s.stats.peakHematotoxicity = 100;
     s.stats.peakCrs = 100;
     s.stats.peakNeuro = 100;

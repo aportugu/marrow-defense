@@ -11,11 +11,15 @@ cellular persistence, and a wave-9 IEC-HS situation directly through enemy behav
 combat feedback, meters, and audiovisual changes. A compact cited Clinical Glossary is
 available from the menu and pause screen without interrupting play.
 
-Two levels are available immediately: the single-lane Marrow campaign and the advanced
-Hepatic campaign, which defends a liver plasmacytoma across portal, arterial, and biliary
-routes before a dedicated wave-10 core encounter. Each level has its own generated score;
+Three levels are available immediately: the single-lane Marrow campaign, the advanced
+Hepatic campaign, and the expert Neuroaxis campaign. Neuroaxis defends anatomically distinct
+cerebral microvascular BBB, choroid-plexus blood–CSF, and pial/leptomeningeal interfaces;
+it adds malignant CNS burden, warned containment decisions, persistent sanctuary deposits,
+and a three-phase periventricular plasmacytoma finale. Its pauseable atlas explicitly separates
+CNS myeloma, ICANS, and tactical gameplay abstractions. Each level has its own generated score;
 Hepatic uses a continuous 80-bar F#-minor synthwave score with a recurring heroic lead,
-driving analog bass, wave-reactive orchestration, and event-responsive mix accents.
+driving analog bass, wave-reactive orchestration, and event-responsive mix accents. Neuroaxis
+uses a continuous 96-bar, 118 BPM E-minor neuro-industrial darkwave score with 3+3+2 accents.
 
 TypeScript + Vite + Canvas. No backend, no auth, no external assets.
 
@@ -94,7 +98,8 @@ open "release/mac-arm64/Marrow Defense.app"
 ## Controls
 
 - `Q` `W` `E` — select units; `1` `2` `3` `4` `5` — activate abilities;
-  `Space`/`Enter` — start wave; `P` — pause; `Esc` — cancel selection.
+  `Space`/`Enter` — start wave; `R` — contain the most imminent CNS breach;
+  `P` — pause; `Esc` — cancel selection.
 
 ## Testing
 

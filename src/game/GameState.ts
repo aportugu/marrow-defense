@@ -4,7 +4,10 @@ import { START } from './Balance';
 import { LEVELS, wavesForLevel } from '../data/levels';
 import { mulberry32 } from '../lib/rng';
 
-const enemyCounts = () => ({ standard: 0, proliferative: 0, highBurden: 0, bcmaLow: 0, hepaticCore: 0 });
+const enemyCounts = () => ({
+  standard: 0, proliferative: 0, highBurden: 0, bcmaLow: 0, hepaticCore: 0,
+  cnsDrifter: 0, leptomeningealSeed: 0, sanctuaryClone: 0, sanctuaryDeposit: 0, parenchymalCore: 0,
+});
 
 function freshStats(): GameState['stats'] {
   return {
@@ -13,6 +16,7 @@ kills: 0,
     peakNeuro: 0,
     peakHyperinflammation: 0,
     peakHematotoxicity: 0,
+    peakCnsBurden: 0,
   lowestFitness: 100,
     severeCrsEvents: 0,
     tociUses: 0,
@@ -77,6 +81,11 @@ export function createInitialState(level: LevelId = 'marrow', seed: number = 133
     activeHepaticEvent: null,
     hepaticCue: null,
     hepaticCueSerial: 0,
+    cnsEventQueue: [],
+    activeCnsBreaches: [],
+    cnsContainmentUsed: false,
+    cnsCue: null,
+    cnsCueSerial: 0,
   };
 }
 
@@ -114,4 +123,9 @@ export function startGame(s: GameState, tutorialActive = true): void {
   s.activeHepaticEvent = null;
   s.hepaticCue = null;
   s.hepaticCueSerial = 0;
+  s.cnsEventQueue = [];
+  s.activeCnsBreaches = [];
+  s.cnsContainmentUsed = false;
+  s.cnsCue = null;
+  s.cnsCueSerial = 0;
 }

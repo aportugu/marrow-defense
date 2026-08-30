@@ -3,10 +3,11 @@ import type { GameState, LevelId } from '../game/types';
 import { LEVELS, LEVEL_ORDER } from '../data/levels';
 import { GLOSSARY, REFERENCES } from '../data/education';
 import { TUTORIAL_DISCLAIMER, TUTORIAL_PAGES } from '../data/tutorial';
+import { CNS_ATLAS_PANELS } from '../data/cnsAtlas';
 import { computeScore } from '../systems/ScoringSystem';
 import { el } from './dom';
 
-type MenuKind = 'entry' | 'start' | 'pause' | 'win' | 'lose' | 'tutorial' | 'glossary' | 'settings';
+type MenuKind = 'entry' | 'start' | 'pause' | 'win' | 'lose' | 'tutorial' | 'atlas' | 'glossary' | 'settings';
 const SCORE_LABELS: Record<string, string> = { hematotoxicity: 'Hematotoxicity control', burden: 'Low burden', fitness: 'Fitness floor', crs: 'CRS control', neuro: 'Neuro control', kills: 'Cells killed', currency: 'Leftover funding', time: 'Speed', precision: 'Leak-free precision' };
 
 export class MenuView {
@@ -17,6 +18,8 @@ export class MenuView {
   private lastMenuKey = '';
   private tutorialPage = 0;
   private tutorialOrigin: 'start' | 'pause' = 'start';
+  private atlasPage = 0;
+  private atlasOrigin: 'start' | 'pause' = 'start';
 
   constructor(private game: Game, private screen: HTMLElement, private canvas: HTMLCanvasElement) {}
 
@@ -47,6 +50,15 @@ export class MenuView {
         this.nav = null;
         this.game.begin(this.selectedLevel, true);
         break;
+      case 'open-atlas':
+        this.atlasOrigin = this.game.state.phase === 'paused' ? 'pause' : 'start';
+        this.atlasPage = 0;
+        this.nav = 'atlas';
+        this.lastMenuKey = '';
+        break;
+      case 'atlas-next': this.atlasPage = Math.min(CNS_ATLAS_PANELS.length - 1, this.atlasPage + 1); this.lastMenuKey = ''; break;
+      case 'atlas-previous': this.atlasPage = Math.max(0, this.atlasPage - 1); this.lastMenuKey = ''; break;
+      case 'atlas-close': this.nav = null; this.lastMenuKey = ''; break;
       case 'resume': this.game.togglePause(); break;
       case 'menu': this.nav = null; this.game.toMenu(); break;
       case 'howto': this.nav = 'glossary'; break;
@@ -80,18 +92,19 @@ export class MenuView {
       const levelRow = el('div', 'level-row');
       for (const id of LEVEL_ORDER) {
         const definition = LEVELS[id]; const selected = this.selectedLevel === id;
-        const button = el('button', `level-card level-${id}${id === 'liver' ? ' advanced' : ''}${selected ? ' selected' : ''}`);
+        const button = el('button', `level-card level-${id}${id === 'liver' ? ' advanced' : ''}${id === 'cns' ? ' expert' : ''}${selected ? ' selected' : ''}`);
         button.setAttribute('aria-pressed', String(selected));
         button.innerHTML = `<div class="lc-head"><span class="lc-name">${definition.name}</span><span class="lc-difficulty">${definition.difficulty}</span></div><div class="lc-tag">${definition.tagline}</div><div class="lc-summary">10 WAVES · ${definition.difficultySummary}</div>${definition.recommendedText ? `<div class="lc-recommended">${definition.recommendedText}</div>` : ''}<div class="lc-footer"><span class="lc-best">${this.game.progress.best[id] ? `Best: ${this.game.progress.best[id]!.response} · ${this.game.progress.best[id]!.score} pts` : 'Best: —'}</span><span class="lc-state">${selected ? 'SELECTED' : 'SELECT'}</span></div>`;
         button.addEventListener('click', () => { this.selectedLevel = id; this.game.previewLevel(id); this.lastMenuKey = ''; });
         levelRow.appendChild(button);
       }
-      card.append(el('p', 'menu-kicker', 'CHOOSE YOUR BATTLEFIELD'), el('h1', undefined, 'MARROW DEFENSE'), el('p', 'tag', 'Defend the patient with engineered CAR-T cells across two distinct plasmacytoma campaigns.'), el('p', 'hs', `RUN HIGH SCORE · ${this.game.highScore} pts`), levelRow, description);
-      addButton(this.selectedLevel === 'liver' ? 'Start Hepatic — Advanced' : 'Start Marrow', 'begin');
-      addButton('Tutorial', 'open-tutorial', true, 'Tutorial'); addButton('Clinical Glossary', 'howto', true, 'Glossary'); addButton('Settings', 'settings', true, 'Settings');
+      card.append(el('p', 'menu-kicker', 'CHOOSE YOUR BATTLEFIELD'), el('h1', undefined, 'MARROW DEFENSE'), el('p', 'tag', 'Defend the patient with engineered CAR-T cells across three distinct plasmacytoma campaigns.'), el('p', 'hs', `RUN HIGH SCORE · ${this.game.highScore} pts`), levelRow, description);
+      const startLabel = this.selectedLevel === 'liver' ? 'Start Hepatic — Advanced' : this.selectedLevel === 'cns' ? 'Start Neuroaxis — Expert' : 'Start Marrow';
+      addButton(startLabel, 'begin');
+      addButton('Tutorial', 'open-tutorial', true, 'Tutorial'); addButton('Neuroaxis Anatomy Atlas', 'open-atlas', true, 'CNS Atlas'); addButton('Clinical Glossary', 'howto', true, 'Glossary'); addButton('Settings', 'settings', true, 'Settings');
       card.append(actions, el('p', 'keys', 'Q/W/E build · 1–5 abilities · SPACE start wave · P pause · ESC cancel'));
     } else if (kind === 'pause') {
-      card.append(el('h1', undefined, 'PAUSED')); addButton('Resume', 'resume'); addButton('Restart', 'restart', true); addButton('Tutorial', 'open-tutorial', true); addButton('Clinical Glossary', 'howto', true); addButton('Settings', 'settings', true); addButton('Quit to menu', 'menu', true);
+      card.append(el('h1', undefined, 'PAUSED')); addButton('Resume', 'resume'); addButton('Restart', 'restart', true); addButton('Tutorial', 'open-tutorial', true); if (state.level === 'cns') addButton('Neuroaxis Anatomy Atlas', 'open-atlas', true); addButton('Clinical Glossary', 'howto', true); addButton('Settings', 'settings', true); addButton('Quit to menu', 'menu', true);
     } else if (kind === 'win' || kind === 'lose') {
       this.selectedLevel = state.level; const result = computeScore(state);
       if (kind === 'win') card.append(el('h1', undefined, `${LEVELS[state.level].name.toUpperCase()} CLEARED`));
@@ -135,6 +148,26 @@ export class MenuView {
       if (!finalPage) addButton('Next', 'tutorial-next');
       else if (this.tutorialOrigin === 'start') addButton(`Start Guided ${LEVELS[this.selectedLevel].name} Run`, 'tutorial-start');
       else addButton('Return to paused game', 'tutorial-close');
+    } else if (kind === 'atlas') {
+      card.classList.add('atlas-card');
+      if (this.atlasOrigin === 'start') card.classList.add('start-card');
+      const panel = CNS_ATLAS_PANELS[this.atlasPage];
+      const title = el('h1', undefined, panel.title); title.id = 'atlas-title';
+      card.setAttribute('aria-labelledby', title.id);
+      const body = el('div', 'atlas-body'); body.setAttribute('role', 'region'); body.setAttribute('aria-live', 'polite');
+      body.appendChild(el('p', 'atlas-summary', panel.summary));
+      for (const point of panel.points) {
+        const section = el('section', 'atlas-item');
+        section.append(el('h2', undefined, point.heading), el('p', undefined, point.text));
+        body.appendChild(section);
+      }
+      const refs = el('div', 'atlas-references'); refs.appendChild(el('h2', undefined, 'Sources'));
+      for (const reference of panel.references) { const link = el('a', undefined, reference.label); link.href = reference.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; refs.appendChild(link); }
+      body.appendChild(refs);
+      card.append(el('p', 'menu-kicker', `NEUROAXIS ATLAS · ${this.atlasPage + 1}/${CNS_ATLAS_PANELS.length}`), title, body, el('p', 'education-disclaimer', 'Educational anatomy and simplified gameplay—not medical or dosing guidance.'));
+      addButton(this.atlasOrigin === 'pause' ? 'Back to paused game' : 'Back to menu', 'atlas-close', true);
+      if (this.atlasPage > 0) addButton('Previous', 'atlas-previous', true);
+      if (this.atlasPage < CNS_ATLAS_PANELS.length - 1) addButton('Next', 'atlas-next');
     } else if (kind === 'glossary') {
       card.append(el('h1', undefined, 'CLINICAL GLOSSARY')); const list = el('div', 'glossary-list');
       for (const entry of GLOSSARY) {
@@ -161,10 +194,11 @@ export class MenuView {
     if (state.phase === 'menu') kind = this.game.hasEnteredMenu ? this.nav ?? 'start' : 'entry';
     else if (state.phase === 'paused') kind = this.nav ?? 'pause'; else if (state.phase === 'won') kind = 'win'; else if (state.phase === 'lost') kind = 'lose';
     if (!kind) { this.screen.classList.remove('opening-menu'); this.root.classList.add('hidden'); this.root.classList.remove('menu-start'); this.canvas.removeAttribute('aria-hidden'); this.lastMenuKey = ''; return; }
-    const opening = kind === 'entry' || kind === 'start' || (kind === 'tutorial' && this.tutorialOrigin === 'start'); this.screen.classList.toggle('opening-menu', opening); this.root.classList.toggle('menu-start', opening); this.root.classList.toggle('menu-entry', kind === 'entry'); this.root.classList.toggle('menu-tutorial', kind === 'tutorial');
+    const opening = kind === 'entry' || kind === 'start' || (kind === 'tutorial' && this.tutorialOrigin === 'start') || (kind === 'atlas' && this.atlasOrigin === 'start'); this.screen.classList.toggle('opening-menu', opening); this.root.classList.toggle('menu-start', opening); this.root.classList.toggle('menu-entry', kind === 'entry'); this.root.classList.toggle('menu-tutorial', kind === 'tutorial'); this.root.classList.toggle('menu-atlas', kind === 'atlas');
     if (opening) this.root.dataset.introScene = String(this.game.introScene); else delete this.root.dataset.introScene;
     if (opening) this.canvas.setAttribute('aria-hidden', 'true'); else this.canvas.removeAttribute('aria-hidden');
-    const key = `${kind}:${kind === 'tutorial' ? this.tutorialPage : ''}:${state.lastWaveReport?.wave ?? ''}`; if (key !== this.lastMenuKey) { this.lastMenuKey = key; this.render(kind, state); }
+    const page = kind === 'tutorial' ? this.tutorialPage : kind === 'atlas' ? this.atlasPage : '';
+    const key = `${kind}:${page}:${state.lastWaveReport?.wave ?? ''}`; if (key !== this.lastMenuKey) { this.lastMenuKey = key; this.render(kind, state); }
     this.root.classList.remove('hidden');
   }
 }

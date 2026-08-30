@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { GameState, Tower, UnitTypeId } from '../game/types';
 import { UNIT } from '../game/Balance';
 import { createInitialState, startGame } from '../game/GameState';
-import { buildPaths, distToLanePaths, placementFailure } from '../lib/path';
+import { buildPaths, distToLanePaths, distToPath, placementFailure, posAt } from '../lib/path';
 import { activate, canActivate, stepAbilities } from './AbilitySystem';
 import { stepEnemies, stepProjectiles, stepTowers } from './CombatSystem';
 import { checkEnd, stepMeters } from './MeterSystem';
-import { stepWave } from './WaveSystem';
+import { containCnsBreach, stepWave } from './WaveSystem';
 
 const paths = buildPaths('marrow');
 const liverPaths = buildPaths('liver');
+const cnsPaths = buildPaths('cns');
 const spots = [
   [120, 495], [260, 613], [400, 349], [540, 313], [680, 218],
   [820, 365], [960, 573], [1100, 387],
@@ -22,6 +23,33 @@ const liverSpots = [
   [760, 180], [760, 420], [760, 550],
   [1050, 230], [1050, 350], [1050, 575],
 ] as const;
+
+function makeCnsSpots(): Array<readonly [number, number]> {
+  const result: Array<readonly [number, number]> = [];
+  const prior: Tower[] = [];
+  for (const fraction of [.16, .38, .62, .8]) {
+    for (let lane = 0; lane < cnsPaths.length; lane++) {
+      const point = posAt(cnsPaths[lane], cnsPaths[lane].length * fraction);
+      let found: readonly [number, number] | null = null;
+      for (let radius = 52; radius <= 100 && !found; radius += 6) {
+        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
+          const x = point.x + Math.cos(angle) * radius;
+          const y = point.y + Math.sin(angle) * radius;
+          const nearest = Math.min(...cnsPaths.map((path) => distToPath(path, x, y)));
+          if (Math.abs(distToPath(cnsPaths[lane], x, y) - nearest) > 1e-6) continue;
+          if (placementFailure(cnsPaths, prior, x, y) === null) found = [x, y];
+        }
+      }
+      if (found) {
+        result.push(found);
+        prior.push({ id: prior.length, type: 'bcma', x: found[0], y: found[1], tier: 0, cd: 0, targetId: null, strength: 0, wavesSurvived: 0, buffPower: 0 });
+      }
+    }
+  }
+  return result;
+}
+
+const cnsSpots = makeCnsSpots();
 
 function addTower(s: GameState, type: UnitTypeId, spot: number): Tower {
   const [x, y] = spots[spot];
@@ -65,6 +93,50 @@ function tickLiver(s: GameState, dt: number): void {
   stepAbilities(s, dt);
   stepMeters(s, dt);
   stepWave(s, dt, liverPaths);
+}
+
+function addCnsTower(s: GameState, type: UnitTypeId, spot: number): Tower {
+  const [x, y] = cnsSpots[spot];
+  const tower: Tower = { id: s.nextId++, type, x, y, tier: 0, cd: 0, targetId: null, strength: type === 'memory' ? 1 : 0, wavesSurvived: 0, buffPower: 0 };
+  s.currency -= UNIT[type].cost; s.towers.push(tower); return tower;
+}
+
+function tickCns(s: GameState, dt: number): void {
+  if (s.subPhase === 'wave') { stepEnemies(s, dt, cnsPaths); stepTowers(s, dt); stepProjectiles(s, dt); }
+  stepAbilities(s, dt); stepMeters(s, dt); stepWave(s, dt, cnsPaths);
+}
+
+function runCnsMixed(): GameState {
+  const s = createInitialState('cns', 29); startGame(s, false);
+  addCnsTower(s, 'bcma', 0); addCnsTower(s, 'bcma', 1);
+  const builds: [UnitTypeId, number][] = [
+    ['bcma', 2], ['dual', 8], ['dual', 7], ['bcma', 6], ['dual', 4], ['bcma', 3],
+    ['memory', 10], ['dual', 11], ['bcma', 5], ['dual', 9],
+  ];
+  let buildIndex = 0; let safety = 0;
+  while (s.phase === 'playing' && safety++ < 60000) {
+    const reserve = s.meters.hematotoxicity >= 35 ? 130 : 55;
+    const build = builds[buildIndex];
+    const upgrade = s.towers.find((tower) => tower.tier === 0);
+    const secondUpgrade = s.towers.find((tower) => tower.tier === 1);
+    if (build && s.towers.length < 3 && s.currency >= UNIT[build[0]].cost + reserve) { addCnsTower(s, ...build); buildIndex++; }
+    else if (upgrade && s.towers.length >= 8 && s.currency >= UNIT[upgrade.type].upgrades[0].cost + reserve) {
+      s.currency -= UNIT[upgrade.type].upgrades[0].cost; upgrade.tier = 1;
+    } else if (build && s.currency >= UNIT[build[0]].cost + reserve) { addCnsTower(s, ...build); buildIndex++; }
+    else if (!build && secondUpgrade && s.currency >= UNIT[secondUpgrade.type].upgrades[1].cost + reserve) {
+      s.currency -= UNIT[secondUpgrade.type].upgrades[1].cost; secondUpgrade.tier = 2;
+      if (secondUpgrade.type === 'memory') secondUpgrade.strength += .5;
+    }
+    const warning = [...s.activeCnsBreaches].filter((event) => event.stage === 'warning').sort((a, b) => a.remaining - b.remaining)[0];
+    if (warning && !s.cnsContainmentUsed && s.currency >= 55 + 75) containCnsBreach(s, warning.id);
+    if (s.meters.crs >= 58 && canActivate(s, 'toci')) activate(s, 'toci');
+    if (s.meters.neuro >= 75 && canActivate(s, 'dexa')) activate(s, 'dexa');
+    if (s.meters.hematotoxicity >= 30 && canActivate(s, 'stemcell')) activate(s, 'stemcell');
+    else if (s.meters.hematotoxicity >= 20 && canActivate(s, 'gcsf')) activate(s, 'gcsf');
+    tickCns(s, .05);
+    const end = checkEnd(s); if (end) s.phase = end;
+  }
+  return s;
 }
 
 function runHepaticMixed(): GameState {
@@ -195,6 +267,15 @@ describe('full-run balance', () => {
     expect(s.meters.fitness).toBeGreaterThan(0);
     expect(s.stats.peakCrs).toBeLessThan(95);
     expect(s.stats.peakNeuro).toBeLessThan(95);
+  });
+
+  it('requires a geographically distributed mixed strategy to clear Neuroaxis', () => {
+    expect(cnsSpots.length).toBeGreaterThanOrEqual(12);
+    const s = runCnsMixed();
+    expect(s.phase, JSON.stringify({ wave: s.wave, meters: s.meters, stats: s.stats, towers: s.towers.length })).toBe('won');
+    expect(s.stats.killsByType.parenchymalCore).toBe(1);
+    expect(s.bossEscaped).toBe(false);
+    expect(new Set(s.towers.map((tower) => cnsPaths.map((path) => distToPath(path, tower.x, tower.y)).indexOf(Math.min(...cnsPaths.map((path) => distToPath(path, tower.x, tower.y)))))).size).toBe(3);
   });
 
   it('punishes an unattended single-unit hepatic strategy before the finale', () => {

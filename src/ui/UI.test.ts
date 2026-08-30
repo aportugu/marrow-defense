@@ -176,12 +176,12 @@ describe('UI', () => {
     expect(game.canvas.getAttribute('aria-hidden')).toBe('true');
     expect(document.querySelector('.screen')?.classList.contains('opening-menu')).toBe(true);
     expect(document.activeElement?.classList.contains('level-card')).toBe(true);
-    expect([...document.querySelectorAll('.level-card')].map((n) => n.classList.contains('selected'))).toEqual([true, false]);
-    expect([...document.querySelectorAll('.level-card')].map((n) => n.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+    expect([...document.querySelectorAll('.level-card')].map((n) => n.classList.contains('selected'))).toEqual([true, false, false]);
+    expect([...document.querySelectorAll('.level-card')].map((n) => n.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false']);
     expect(document.querySelector('.menu-kicker')?.textContent).toBe('CHOOSE YOUR BATTLEFIELD');
     expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Start Marrow')).toBe(true);
     expect([...document.querySelectorAll<HTMLButtonElement>('.menu-actions [data-mobile-label]')]
-      .map((button) => button.dataset.mobileLabel)).toEqual(['Tutorial', 'Glossary', 'Settings']);
+      .map((button) => button.dataset.mobileLabel)).toEqual(['Tutorial', 'CNS Atlas', 'Glossary', 'Settings']);
   });
 
   it('explains the game and treatment matching in a four-page tutorial', () => {
@@ -387,7 +387,7 @@ describe('UI', () => {
   it('shows the simulated response, full name, score, and disclaimer after a win', () => {
     const { game, state } = setup();
     state.phase = 'won';
-    state.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0 };
+    state.meters = { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, hyperinflammation: 0, cnsBurden: 0 };
     state.stats.peakCrs = 0;
     state.stats.peakNeuro = 0;
     state.stats.peakHematotoxicity = 0;

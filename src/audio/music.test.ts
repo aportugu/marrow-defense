@@ -3,6 +3,7 @@ import {
   ARRANGEMENTS, HEPATIC_ANSWER, HEPATIC_ARRANGEMENTS, HEPATIC_A_SEQUENCE, HEPATIC_B_SEQUENCE,
   HEPATIC_CHORDS, HEPATIC_FORM_ORDER, HEPATIC_FORM_SECTIONS, HEPATIC_LEITMOTIF, HEPATIC_SCALE,
   HEPATIC_VOICES, DUCK_GAIN, DUCK_SECONDS, Music, VOICES, VOICE_LIMIT,
+  CNS_ARRANGEMENTS, CNS_CHORDS, CNS_FORM_ORDER, CNS_FORM_SECTIONS, CNS_LEITMOTIF, CNS_SCALE, CNS_VOICES, cnsStinger,
   arrangementFor, hepaticStinger, hepaticWaveProfile, hepaticWaveTier,
   nextBarStep, noteFrequency, resolveMusicScene, smoothIntensity, variationIndex,
   type MusicSnapshot,
@@ -92,6 +93,39 @@ describe('adaptive score composition', () => {
     expect(HEPATIC_VOICES.bass?.release).toBeLessThan(VOICES.bass.release);
     expect(HEPATIC_VOICES.lead?.resonance).toBeLessThan(VOICES.lead.resonance);
     expect(HEPATIC_VOICES.lead?.cutoff).toBeGreaterThan(VOICES.lead.cutoff);
+  });
+
+  it('routes Neuroaxis through a continuous 96-bar E-minor industrial form', () => {
+    for (const scene of ['planning', 'wave', 'danger', 'iecHs', 'boss', 'paused'] as const) {
+      const arrangement = arrangementFor('cns', scene);
+      expect(arrangement.bpm).toBe(118);
+      expect(arrangement.sections).toBe(CNS_FORM_SECTIONS);
+      expect(arrangement.order).toBe(CNS_FORM_ORDER);
+    }
+    expect(CNS_FORM_SECTIONS).toHaveLength(48);
+    expect(CNS_FORM_ORDER).toEqual(Array.from({ length: 48 }, (_, index) => index));
+    expect(CNS_FORM_SECTIONS.length * 2).toBe(96);
+    expect(CNS_LEITMOTIF).toEqual(['E4', 'G4', 'B4', 'D5', 'B4', 'G4']);
+    expect(CNS_ARRANGEMENTS.victory?.bpm).toBe(118);
+    expect(CNS_ARRANGEMENTS.loss?.bpm).toBe(118);
+    expect(CNS_VOICES.lead).not.toEqual(VOICES.lead);
+    const pitchClass = (note: string): string => note.replace(/-?\d$/, '');
+    const expectedRoots = Array.from({ length: 96 }, (_, bar) => ['E', 'C', 'G', 'D'][bar % 4]);
+    expect(CNS_FORM_SECTIONS.flatMap((section) => section.chords.map((notes) => pitchClass(notes[0])))).toEqual(expectedRoots);
+    for (const section of CNS_FORM_SECTIONS) {
+      const pitches = [...section.chords.flat(), ...section.bass, ...section.arp, ...(section.melody?.map((event) => event.note) ?? [])]
+        .filter((note): note is string => Boolean(note));
+      expect(pitches.every((note) => CNS_SCALE.includes(pitchClass(note) as typeof CNS_SCALE[number]))).toBe(true);
+      for (let step = 0; step < 32; step += 1) {
+        const activeChord = section.chords[Math.floor(step / 16)].map(pitchClass);
+        if (section.arp[step]) expect(activeChord).toContain(pitchClass(section.arp[step]!));
+      }
+      for (const accent of [0, 6, 12, 16, 22, 28]) {
+        if (section.kick.some(Boolean)) expect(section.kick[accent]).not.toBeNull();
+      }
+    }
+    expect(CNS_FORM_SECTIONS[0].chords[0]).toBe(CNS_CHORDS.tonic);
+    expect(cnsStinger('waveStart', 0)).toEqual(['E3', 'G3', 'B3']);
   });
 
   it('retains the wave-tier helper without allowing tiers to replace the authored form', () => {

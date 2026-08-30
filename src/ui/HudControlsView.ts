@@ -1,6 +1,6 @@
 import type { Game } from '../game/Game';
 import type { AbilityId, GameState, UnitTypeId } from '../game/types';
-import { ABILITY, GCSF, METER, STEMCELL, UNIT } from '../game/Balance';
+import { ABILITY, CNS, GCSF, METER, STEMCELL, UNIT } from '../game/Balance';
 import { canActivate } from '../systems/AbilitySystem';
 import { el } from './dom';
 
@@ -24,6 +24,11 @@ export class HudControlsView {
   private meterBox: Record<string, HTMLElement> = {};
   private currencyEl = el('div', 'currency');
   private waveEl = el('div', 'wave');
+  private cnsPanel = el('section', 'cns-hud hidden');
+  private cnsBurdenFill = el('span');
+  private cnsBurdenValue = el('b', undefined, '0');
+  private cnsWarnings = el('div', 'cns-warnings');
+  private cnsKey = '';
   private speedBtn = el('button', 'btn ghost icon-btn', '1\u00D7');
   private abilityWasCooling: Partial<Record<AbilityId, boolean>> = {};
   private abilityEls = Object.fromEntries(ABILITY_IDS.map((id) => [id, {
@@ -58,7 +63,12 @@ export class HudControlsView {
       this.meterBox[meter.id] = box; this.meterFill[meter.id] = fill; this.meterVal[meter.id] = val;
     }
     const mid = el('div', 'hud-mid');
-    mid.append(this.currencyEl, this.waveEl);
+    const cnsTitle = el('div', 'cns-burden-title');
+    cnsTitle.append(document.createTextNode('CNS DISEASE BURDEN '), this.cnsBurdenValue);
+    const cnsTrack = el('div', 'cns-burden-track'); cnsTrack.appendChild(this.cnsBurdenFill);
+    this.cnsPanel.setAttribute('aria-label', 'CNS disease burden and interface containment');
+    this.cnsPanel.append(cnsTitle, cnsTrack, this.cnsWarnings);
+    mid.append(this.currencyEl, this.waveEl, this.cnsPanel);
     const right = el('div', 'hud-right');
     const pauseBtn = el('button', 'btn ghost icon-btn', '\u2758\u2758');
     pauseBtn.title = 'Pause (P)'; pauseBtn.setAttribute('aria-label', 'Pause game');
@@ -142,6 +152,40 @@ export class HudControlsView {
     this.currencyEl.textContent = `\u25C9 ${Math.floor(state.currency)}`;
     this.waveEl.textContent = `Wave ${Math.min(state.wave, state.wavesTotal)} / ${state.wavesTotal}`;
     this.speedBtn.textContent = `${this.game.settings.speed}\u00D7`;
+
+    this.cnsPanel.classList.toggle('hidden', state.level !== 'cns');
+    if (state.level === 'cns') {
+      const burden = Math.round(state.meters.cnsBurden);
+      this.cnsBurdenValue.textContent = String(burden);
+      this.cnsBurdenFill.style.width = `${burden}%`;
+      this.cnsPanel.classList.toggle('warn', burden >= 70);
+      const warnings = state.activeCnsBreaches.filter((event) => event.stage === 'warning');
+      const key = `${state.cnsContainmentUsed}:${Math.floor(state.currency)}:${warnings.map((event) => `${event.id}:${Math.ceil(event.remaining)}:${event.contained}`).join('|')}`;
+      if (key !== this.cnsKey) {
+        this.cnsKey = key;
+        this.cnsWarnings.innerHTML = '';
+        if (warnings.length === 0) {
+          this.cnsWarnings.appendChild(el('span', 'cns-quiet', state.cnsContainmentUsed ? 'Containment used this wave' : 'Interfaces monitored'));
+        } else {
+          for (const warning of warnings) {
+            const names = {
+              bloodCsf: 'CHOROID PLEXUS',
+              bbb: 'CORTICAL BBB',
+              leptomeningeal: 'LEPTOMENINGEAL',
+            } as const;
+            const button = el('button', `cns-contain route-${warning.interface}`);
+            button.type = 'button';
+            button.disabled = state.cnsContainmentUsed || state.currency < CNS.containmentCost || warning.contained;
+            button.setAttribute('aria-label', `Contain ${names[warning.interface].toLowerCase()} entry, ${Math.max(0, Math.ceil(warning.remaining))} seconds, costs ${CNS.containmentCost} funding`);
+            button.innerHTML = `<span class="route-symbol" aria-hidden="true">${warning.interface === 'bloodCsf' ? 'VENT' : warning.interface === 'bbb' ? 'BBB' : 'PIA'}</span><span>${names[warning.interface]} · ${Math.max(0, Math.ceil(warning.remaining))}s</span><b>${warning.contained ? 'DELAYED' : state.cnsContainmentUsed ? 'USED' : `CONTAIN ${CNS.containmentCost}`}</b>`;
+            button.addEventListener('click', () => this.game.containCnsBreach(warning.id));
+            this.cnsWarnings.appendChild(button);
+          }
+        }
+      }
+    } else {
+      this.cnsKey = '';
+    }
 
     for (const id of ABILITY_IDS) {
       const def = ABILITY[id]; const ability = state.abilities[id]; const control = this.abilityEls[id];

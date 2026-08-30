@@ -5,7 +5,7 @@ import type { EnemyTypeId, UnitTypeId, AbilityId, ResponseCategory } from './typ
 export const START = {
   currency: 120,
   countdown: 12,
-  meter: { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0 },
+  meter: { burden: 0, crs: 0, neuro: 0, fitness: 100, hematotoxicity: 0, cnsBurden: 0 },
 };
 
 // Free-placement rules for CAR-T units inside the marrow.
@@ -60,6 +60,57 @@ export const ENEMY: Record<EnemyTypeId, EnemyDef> = {
     escapeBurden: 35, escapeHematotoxicity: 14,
     color: '#c026d3', icon: 'mass', label: 'Hepatic plasmacytoma core',
   },
+  cnsDrifter: {
+    hp: 30, speed: 98, size: 9, reward: 7, crsOnKill: 1.3,
+    neuroOnKill: 0.5, escapeBurden: 3, escapeHematotoxicity: 1,
+    color: '#60a5fa', icon: 'burst', label: 'CSF drifter',
+  },
+  leptomeningealSeed: {
+    hp: 165, speed: 40, size: 16, reward: 24, crsOnKill: 6,
+    neuroOnKill: 0.9, escapeBurden: 8, escapeHematotoxicity: 3,
+    color: '#f472b6', icon: 'cell', label: 'Leptomeningeal seed',
+  },
+  sanctuaryClone: {
+    hp: 85, speed: 50, size: 14, reward: 16, crsOnKill: 4.5,
+    neuroOnKill: 0.8, escapeBurden: 7, escapeHematotoxicity: 2,
+    color: '#818cf8', icon: 'dim', label: 'Sanctuary clone',
+  },
+  sanctuaryDeposit: {
+    hp: 280, speed: 0, size: 23, reward: 35, crsOnKill: 7,
+    neuroOnKill: 1, escapeBurden: 0, escapeHematotoxicity: 0,
+    color: '#c084fc', icon: 'mass', label: 'CNS sanctuary deposit',
+  },
+  parenchymalCore: {
+    hp: 1200, speed: 4, size: 32, reward: 200, crsOnKill: 20,
+    neuroOnKill: 3, escapeBurden: 35, escapeHematotoxicity: 10,
+    color: '#e879f9', icon: 'mass', label: 'Parenchymal plasmacytoma core',
+  },
+};
+
+export const CNS = {
+  containmentCost: 55,
+  warningSeconds: 4,
+  containmentDelay: 5,
+  containmentBlockFraction: 0.35,
+  containedSpeedMultiplier: 0.8,
+  waveClearRecovery: 6,
+  depositKillRecovery: 8,
+  depositBurdenPerSecond: 0.36,
+  corePulseInterval: 8,
+  corePulseNeuro: 4,
+  corePulseFitness: 1.5,
+  escapeBurden: {
+    standard: 2,
+    proliferative: 1,
+    highBurden: 8,
+    bcmaLow: 3,
+    hepaticCore: 20,
+    cnsDrifter: 3,
+    leptomeningealSeed: 8,
+    sanctuaryClone: 4,
+    sanctuaryDeposit: 0,
+    parenchymalCore: 100,
+  } satisfies Record<EnemyTypeId, number>,
 };
 
 export interface UpgradeDef {

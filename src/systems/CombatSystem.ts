@@ -2,7 +2,7 @@
 // and kill effects. Operates on GameState only (no DOM/canvas), so it is
 // deterministically testable.
 import type { ComputedTowerStats, GameState, Tower, Enemy, UnitTypeId } from '../game/types';
-import { UNIT, ENEMY, METER, DEXA, ECONOMY, IEC_HS } from '../game/Balance';
+import { UNIT, ENEMY, METER, DEXA, ECONOMY, IEC_HS, CNS } from '../game/Balance';
 import { clamp, dist2 } from '../lib/math';
 import { posAt, type PathDef } from '../lib/path';
 import { LEVELS } from '../data/levels';
@@ -10,6 +10,11 @@ import { LEVELS } from '../data/levels';
 function cue(s: GameState, kind: NonNullable<GameState['hepaticCue']>['kind'], lane: number): void {
   s.hepaticCueSerial++;
   s.hepaticCue = { serial: s.hepaticCueSerial, kind, lane };
+}
+
+function cnsCue(s: GameState, kind: NonNullable<GameState['cnsCue']>['kind'], lane: number): void {
+  s.cnsCueSerial++;
+  s.cnsCue = { serial: s.cnsCueSerial, kind, lane };
 }
 
 function spawnAtEnemy(s: GameState, source: Enemy, type: Enemy['type'], behavior?: Enemy['behavior']): Enemy {
@@ -109,6 +114,10 @@ export function stepEnemies(s: GameState, dt: number, paths: PathDef[]): number 
   let escapes = 0;
   for (const e of s.enemies) {
     if (!e.alive) continue;
+    if (e.type === 'sanctuaryDeposit') {
+      s.meters.cnsBurden = clamp(s.meters.cnsBurden + CNS.depositBurdenPerSecond * dt, 0, 100);
+      continue;
+    }
     if (e.behavior === 'bossEscort' && e.parentBossId != null) {
       const boss = s.enemies.find((candidate) => candidate.id === e.parentBossId && candidate.alive);
       if (!boss) {
@@ -123,6 +132,35 @@ export function stepEnemies(s: GameState, dt: number, paths: PathDef[]): number 
     }
     const en = ENEMY[e.type];
     const path = paths[((e.lane % paths.length) + paths.length) % paths.length];
+    if (e.type === 'leptomeningealSeed' && e.anchorAt != null && e.pathPos >= e.anchorAt) {
+      e.pathPos = e.anchorAt;
+      e.speed = 0;
+      e.behavior = 'sanctuary';
+      const anchored = posAt(path, e.pathPos);
+      e.x = anchored.x; e.y = anchored.y;
+      s.meters.cnsBurden = clamp(s.meters.cnsBurden + CNS.depositBurdenPerSecond * dt, 0, 100);
+      continue;
+    }
+    if (e.type === 'parenchymalCore') {
+      const depositsRemain = s.enemies.some((candidate) => candidate.alive && candidate.type === 'sanctuaryDeposit');
+      if (depositsRemain) {
+        e.speed = 0;
+      } else if ((e.bossPhase ?? 1) === 1) {
+        e.bossPhase = 2;
+        e.speed = e.baseSpeed ?? ENEMY.parenchymalCore.speed;
+        queueCnsCoreBreaches(s);
+        cnsCue(s, 'corePhase2', e.lane);
+      }
+      if ((e.bossPhase ?? 1) >= 2) {
+        e.pulseTimer = (e.pulseTimer ?? CNS.corePulseInterval) - dt;
+        if (e.pulseTimer <= 0) {
+          e.pulseTimer = CNS.corePulseInterval;
+          const steroidFactor = s.stats.time < s.dexaUntil ? .5 : 1;
+          s.meters.neuro = clamp(s.meters.neuro + CNS.corePulseNeuro * steroidFactor, 0, 100);
+          s.meters.fitness = clamp(s.meters.fitness - CNS.corePulseFitness, 0, 100);
+        }
+      }
+    }
     if (e.behavior === 'obstruction' && e.pathPos >= path.length * .62 && (e.escortsSpawned ?? 0) < 3) {
       if (e.obstructionTimer == null) {
         e.obstructionTimer = 0;
@@ -144,11 +182,12 @@ export function stepEnemies(s: GameState, dt: number, paths: PathDef[]): number 
     e.y = p.y;
     if (e.pathPos >= path.length) {
       e.alive = false;
-      if (e.type === 'hepaticCore') s.bossEscaped = true;
+      if (e.type === 'hepaticCore' || e.type === 'parenchymalCore') s.bossEscaped = true;
       escapes++;
       s.stats.escapes++;
       s.stats.escapesByType[e.type]++;
       s.meters.burden = clamp(s.meters.burden + en.escapeBurden, 0, 100);
+      if (s.level === 'cns') s.meters.cnsBurden = clamp(s.meters.cnsBurden + CNS.escapeBurden[e.type], 0, 100);
       s.hematotoxicityLoad += en.escapeHematotoxicity;
       s.particles.push({
         x: e.x, y: e.y, vx: 0, vy: 0, life: 0.4, maxLife: 0.4,
@@ -208,6 +247,10 @@ export function killEnemy(
   s.stats.fundingEarned += e.reward;
   s.stats.kills++;
   s.stats.killsByType[e.type]++;
+  if (s.level === 'cns' && (e.type === 'sanctuaryDeposit' || (e.type === 'leptomeningealSeed' && e.behavior === 'sanctuary'))) {
+    s.meters.cnsBurden = clamp(s.meters.cnsBurden - CNS.depositKillRecovery, 0, 100);
+    cnsCue(s, 'deposit', e.lane);
+  }
   if (e.behavior === 'bossEscort' && e.parentBossId != null) {
     const shieldRemaining = s.enemies.some((other) =>
       other.alive && other.behavior === 'bossEscort' && other.parentBossId === e.parentBossId,
@@ -285,6 +328,19 @@ function queueBossSurge(s: GameState, lane: number, delay: number, count: number
   });
 }
 
+function queueCnsCoreBreaches(s: GameState): void {
+  const interfaces = ['bbb', 'bloodCsf', 'leptomeningeal'] as const;
+  for (let lane = 0; lane < interfaces.length; lane++) {
+    s.cnsEventQueue.push({
+      id: 20000 + s.cnsCueSerial * 10 + lane,
+      interface: interfaces[lane], lane, at: s.waveTimer + 5 + lane * 6,
+      count: 4, enemyType: lane === 0 ? 'sanctuaryClone' : 'cnsDrifter',
+      warned: false, fired: false, contained: false,
+    });
+  }
+  s.cnsEventQueue.sort((a, b) => a.at - b.at);
+}
+
 function updateBossPhase(s: GameState, boss: Enemy): void {
   const fraction = boss.hp / boss.maxHp;
   if ((boss.bossPhase ?? 1) === 1 && fraction <= .65) {
@@ -297,6 +353,15 @@ function updateBossPhase(s: GameState, boss: Enemy): void {
     boss.bossPhase = 3;
     boss.speed = (boss.baseSpeed ?? boss.speed) * 1.5;
     cue(s, 'bossPhase3', boss.lane);
+  }
+}
+
+function updateCnsBossPhase(s: GameState, boss: Enemy): void {
+  if ((boss.bossPhase ?? 1) < 2) return;
+  if ((boss.bossPhase ?? 2) < 3 && boss.hp / boss.maxHp <= .5) {
+    boss.bossPhase = 3;
+    boss.speed = (boss.baseSpeed ?? ENEMY.parenchymalCore.speed) * 2;
+    cnsCue(s, 'corePhase3', boss.lane);
   }
 }
 
@@ -323,10 +388,15 @@ export function stepProjectiles(s: GameState, dt: number): void {
       const shielded = target.type === 'hepaticCore' && s.enemies.some((enemy) =>
         enemy.alive && enemy.behavior === 'bossEscort' && enemy.parentBossId === target.id,
       );
-      target.hp -= p.damage * (shielded ? .5 : 1);
+      const cnsShielded = target.type === 'parenchymalCore' && s.enemies.some((enemy) => enemy.alive && enemy.type === 'sanctuaryDeposit');
+      const sanctuaryProtected = target.type === 'sanctuaryClone'
+        && target.pathPos > 350 && target.pathPos < 850;
+      const resistance = cnsShielded ? 0 : shielded ? .5 : sanctuaryProtected && target.pathPos > 350 && target.pathPos < 850 ? .7 : 1;
+      target.hp -= p.damage * resistance;
       if (target.hp <= 0) killEnemy(s, target, p.unit, p.crsFactor);
       else if (target.behavior === 'mitotic' && !target.splitDone && target.hp <= target.maxHp * .5) splitMitoticEnemy(s, target);
       else if (target.type === 'hepaticCore') updateBossPhase(s, target);
+      else if (target.type === 'parenchymalCore') updateCnsBossPhase(s, target);
     } else {
       p.x += (dx / d) * step;
       p.y += (dy / d) * step;

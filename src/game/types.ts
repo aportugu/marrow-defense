@@ -6,16 +6,19 @@ export type Vec = { x: number; y: number };
 export const CANVAS_W = 1280;
 export const CANVAS_H = 720;
 
-export type EnemyTypeId = 'standard' | 'proliferative' | 'highBurden' | 'bcmaLow' | 'hepaticCore';
+export type EnemyTypeId =
+  | 'standard' | 'proliferative' | 'highBurden' | 'bcmaLow' | 'hepaticCore'
+  | 'cnsDrifter' | 'leptomeningealSeed' | 'sanctuaryClone' | 'sanctuaryDeposit' | 'parenchymalCore';
 export type UnitTypeId = 'bcma' | 'dual' | 'memory';
 export type AbilityId = 'toci' | 'dexa' | 'stemcell' | 'anakinra' | 'gcsf';
 export type HintId = 'chooseUnit' | 'placeUnit' | 'startWave' | 'monitorWave' | 'reinforce';
 
 export type GamePhase = 'menu' | 'playing' | 'paused' | 'won' | 'lost';
 export type SubPhase = 'planning' | 'wave';
-export type LevelId = 'marrow' | 'liver';
+export type LevelId = 'marrow' | 'liver' | 'cns';
 export type ResponseCategory = 'sCR' | 'CR' | 'VGPR' | 'PR' | 'SD' | 'PD';
-export type EnemyBehavior = 'mitotic' | 'obstruction' | 'bossEscort' | 'surge';
+export type EnemyBehavior = 'mitotic' | 'obstruction' | 'bossEscort' | 'surge' | 'contained' | 'sanctuary' | 'deposit';
+export type CnsInterface = 'bloodCsf' | 'bbb' | 'leptomeningeal';
 export type HepaticEventKind = 'surge' | 'bossPhase';
 export type HepaticCueKind = 'flareWarn' | 'flareImpact' | 'division' | 'obstruction' | 'shieldBreak' | 'bossPhase2' | 'bossPhase3';
 
@@ -44,6 +47,9 @@ export interface Enemy {
   parentBossId?: number;
   bossPhase?: 1 | 2 | 3;
   baseSpeed?: number;
+  anchorAt?: number;
+  pulseTimer?: number;
+  sanctuarySite?: 'ventricular' | 'basalCisternal' | 'lumbarCistern';
 }
 
 export interface Tower {
@@ -90,6 +96,7 @@ export interface Meters {
   fitness: number; // 0..100, lose @ 0
   hematotoxicity: number; // 0..100, higher is worse; indirect fitness pressure
   hyperinflammation: number; // 0..100, IEC-HS pressure; lose @ 100
+  cnsBurden: number; // 0..100, malignant CNS disease pressure; CNS level only
 }
 
 export interface AbilityState {
@@ -108,6 +115,7 @@ export interface Stats {
   peakNeuro: number;
   peakHyperinflammation: number;
   peakHematotoxicity: number;
+  peakCnsBurden: number;
   lowestFitness: number;
   severeCrsEvents: number;
   tociUses: number;
@@ -132,6 +140,7 @@ export interface WaveReport {
   peakNeuro: number;
   peakHyperinflammation: number;
   peakHematotoxicity: number;
+  peakCnsBurden: number;
   startMeters: Meters;
   endMeters: Meters;
   killsByType: Record<EnemyTypeId, number>;
@@ -147,6 +156,7 @@ export interface WaveBaseline {
   peakNeuro: number;
   peakHyperinflammation: number;
   peakHematotoxicity: number;
+  peakCnsBurden: number;
   startMeters: Meters;
   killsByType: Record<EnemyTypeId, number>;
   escapesByType: Record<EnemyTypeId, number>;
@@ -200,6 +210,35 @@ export interface HepaticCue {
   lane: number;
 }
 
+export interface CnsBreachEntry {
+  id: number;
+  interface: CnsInterface;
+  lane: number;
+  at: number;
+  count: number;
+  enemyType: EnemyTypeId;
+  warned: boolean;
+  fired: boolean;
+  contained: boolean;
+}
+
+export interface ActiveCnsBreach {
+  id: number;
+  interface: CnsInterface;
+  lane: number;
+  stage: 'warning' | 'impact';
+  remaining: number;
+  contained: boolean;
+}
+
+export type CnsCueKind = 'breachWarn' | 'breachImpact' | 'containment' | 'deposit' | 'corePhase2' | 'corePhase3';
+
+export interface CnsCue {
+  serial: number;
+  kind: CnsCueKind;
+  lane: number;
+}
+
 export interface GameState {
   phase: GamePhase;
   subPhase: SubPhase;
@@ -237,4 +276,9 @@ export interface GameState {
   activeHepaticEvent: ActiveHepaticEvent | null;
   hepaticCue: HepaticCue | null;
   hepaticCueSerial: number;
+  cnsEventQueue: CnsBreachEntry[];
+  activeCnsBreaches: ActiveCnsBreach[];
+  cnsContainmentUsed: boolean;
+  cnsCue: CnsCue | null;
+  cnsCueSerial: number;
 }

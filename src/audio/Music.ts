@@ -35,6 +35,7 @@ export type MusicEvent =
   | 'victory'
   | 'loss'
   | 'hepaticSelect'
+  | 'cnsSelect'
   | 'flareWarn'
   | 'flareImpact'
   | 'division'
@@ -489,6 +490,85 @@ export const HEPATIC_ARRANGEMENTS: Partial<Record<MusicScene, SceneArrangement>>
   loss: { bpm: 114, order: [0, 1], sections: hepaticLossSections, density: 1, brightness: .48 },
 };
 
+// Neuroaxis: a deterministic 96-bar form (48 two-bar sections) in E natural
+// minor. Cold 3+3+2 pulses distinguish it from the hepatic synthwave score.
+export const CNS_SCALE = ['E', 'F#', 'G', 'A', 'B', 'C', 'D'] as const;
+export const CNS_CHORDS = {
+  tonic: chord('E1', 'B1', 'E2', 'G2', 'B2'),
+  submediant: chord('C2', 'G2', 'C3', 'E3', 'G3'),
+  mediant: chord('G1', 'D2', 'G2', 'B2', 'D3'),
+  subtonic: chord('D2', 'A2', 'D3', 'F#3', 'A3'),
+} as const;
+
+const CNS_MOTIF = melody(
+  [0, 'E4', 3, .92], [6, 'G4', 3, .88], [12, 'B4', 4, .96],
+  [16, 'D5', 3, .9], [22, 'B4', 3, .86], [28, 'G4', 4, .92],
+);
+const CNS_ANSWER = melody(
+  [0, 'G4', 3, .88], [6, 'B4', 3, .92], [12, 'D5', 4, .96],
+  [16, 'F#5', 3, .9], [22, 'E5', 3, .88], [28, 'D5', 4, .92],
+);
+const CNS_RISE = melody(
+  [0, 'B4', 3, .9], [6, 'D5', 3, .9], [12, 'E5', 4, .98],
+  [16, 'D5', 3, .9], [22, 'F#5', 3, .92], [28, 'G5', 4, .98],
+);
+const CNS_RETURN = melody(
+  [0, 'E5', 3, .94], [6, 'D5', 3, .88], [12, 'B4', 4, .92],
+  [16, 'A4', 3, .86], [22, 'F#4', 3, .84], [28, 'E4', 4, .94],
+);
+export const CNS_LEITMOTIF = ['E4', 'G4', 'B4', 'D5', 'B4', 'G4'] as const;
+
+const CNS_KICK = drums({ 0: 'o', 6: 'x', 12: 'x', 16: 'o', 22: 'x', 28: 'x' });
+const CNS_SNARE = drums({ 4: 'o', 12: 'o', 20: 'o', 28: 'o' });
+const CNS_HATS = drums({ 0: 'x', 2: 'x', 4: 'x', 6: 'o', 8: 'x', 10: 'x', 12: 'o', 14: 'x', 16: 'x', 18: 'x', 20: 'x', 22: 'o', 24: 'x', 26: 'x', 28: 'o', 30: 'x' });
+const cnsHarmony = (index: number): ReadonlyArray<Chord> => index % 2 === 0
+  ? [CNS_CHORDS.tonic, CNS_CHORDS.submediant]
+  : [CNS_CHORDS.mediant, CNS_CHORDS.subtonic];
+const cnsArpBar = (notes: readonly string[]): string[] => Array.from({ length: 16 }, (_, step) => notes[step % 4]);
+const cnsArp = (index: number): Pattern => index % 2 === 0
+  ? [...cnsArpBar(['E4', 'B4', 'G4', 'B4']), ...cnsArpBar(['C4', 'G4', 'E4', 'G4'])]
+  : [...cnsArpBar(['G3', 'D4', 'B3', 'D4']), ...cnsArpBar(['D4', 'A4', 'F#4', 'A4'])];
+const cnsBassBar = (root: string, fifth: string, octave: string): Pattern => Array.from({ length: 16 }, (_, step) => {
+  if (step % 2 !== 0) return null;
+  return [root, root, fifth, root, octave, root, fifth, root][step / 2];
+});
+const cnsBass = (index: number): Pattern => index % 2 === 0
+  ? [...cnsBassBar('E1', 'B1', 'E2'), ...cnsBassBar('C2', 'G2', 'C3')]
+  : [...cnsBassBar('G1', 'D2', 'G2'), ...cnsBassBar('D2', 'A2', 'D3')];
+const CNS_PHRASES = [CNS_MOTIF, CNS_ANSWER, CNS_RISE, CNS_RETURN] as const;
+
+const cnsSection = (index: number, intensity: number, sparse = false): ArrangementSection => ({
+  name: `neuroaxis-${String(index + 1).padStart(2, '0')}`,
+  chords: cnsHarmony(index), stepsPerChord: 16,
+  bass: sparse ? pattern({ 0: index % 2 === 0 ? 'E1' : 'G1', 16: index % 2 === 0 ? 'C2' : 'D2' }) : cnsBass(index),
+  lead: EMPTY_PATTERN,
+  melody: sparse ? CNS_PHRASES[index % 4].filter((event) => event.step === 0 || event.step === 12 || event.step === 28) : CNS_PHRASES[index % 4],
+  leadDouble: intensity >= .92 ? upperDoubling(CNS_PHRASES[index % 4]) : undefined,
+  counter: pattern(index % 3 === 0 ? { 3: 'E5', 9: 'B4', 19: 'G5', 25: 'D5' } : index % 3 === 1 ? { 1: 'B3', 7: 'E4', 17: 'G4', 23: 'C5' } : { 5: 'D4', 11: 'A4', 21: 'E4', 27: 'B4' }),
+  arp: cnsArp(index), brass: EMPTY_PATTERN, strings: EMPTY_PATTERN,
+  kick: sparse ? EMPTY_DRUMS : CNS_KICK, snare: sparse ? EMPTY_DRUMS : CNS_SNARE,
+  hat: sparse ? drums({ 6: 'x', 14: 'x', 22: 'x', 30: 'x' }) : CNS_HATS,
+  texture: drums({ 0: 'x', 6: 'x', 12: 'x', 16: 'x', 22: 'x', 28: 'x' }),
+  tom: !sparse && (index + 1) % 8 === 0 ? SYNTHWAVE_FILL : EMPTY_DRUMS,
+  filterScale: .68 + intensity * .46,
+  layerLevels: { pad: .76, bass: .96 + intensity * .12, arp: .36 + intensity * .16, lead: 1.1, counter: .42, drums: .82 + intensity * .18, texture: .58 },
+});
+
+const cnsSections = Array.from({ length: 48 }, (_, index) => {
+  const sparse = index < 4 || index >= 46;
+  const intensity = index < 4 ? .22 + index * .1 : index < 16 ? .58 : index < 28 ? .74 : index < 40 ? .9 : 1;
+  return cnsSection(index, intensity, sparse);
+});
+export const CNS_FORM_SECTIONS: ReadonlyArray<ArrangementSection> = cnsSections;
+export const CNS_FORM_ORDER: ReadonlyArray<number> = cnsSections.map((_, index) => index);
+const cnsContinuous = (brightness: number): SceneArrangement => ({ bpm: 118, order: CNS_FORM_ORDER, sections: CNS_FORM_SECTIONS, density: 1, brightness });
+export const CNS_ARRANGEMENTS: Partial<Record<MusicScene, SceneArrangement>> = {
+  planning: cnsContinuous(.68), wave: cnsContinuous(.8), danger: cnsContinuous(.9),
+  iecHs: cnsContinuous(.7), boss: cnsContinuous(.92), paused: cnsContinuous(.58),
+  victory: { bpm: 118, order: [0, 1], sections: [cnsSection(40, 1), cnsSection(41, 1)], density: 1, brightness: .95 },
+  loss: { bpm: 118, order: [0, 1], sections: [cnsSection(46, .3, true), cnsSection(47, .2, true)], density: 1, brightness: .36 },
+};
+
 const HEPATIC_STINGER_CHORDS = [
   { low: ['F#2', 'C#3', 'A3'], high: ['F#4', 'A4', 'C#5'] },
   { low: ['E2', 'B2', 'G#3'], high: ['E4', 'G#4', 'B4'] },
@@ -517,6 +597,25 @@ export function hepaticStinger(event: MusicEvent, bar: number): ReadonlyArray<st
     shieldBreak: [tones.low[0], tones.low[2], tones.high[0], tones.high[1]],
     bossPhase2: [tones.low[0], tones.low[2], tones.low[1], tones.high[0]],
     bossPhase3: [tones.high[0], tones.high[2], tones.high[1], tones.high[0]],
+  };
+  return shapes[event];
+}
+
+const CNS_STINGER_CHORDS = [
+  ['E3', 'G3', 'B3'], ['C3', 'E3', 'G3'], ['G2', 'B2', 'D3'], ['D3', 'F#3', 'A3'],
+] as const;
+
+export function cnsStinger(event: MusicEvent, bar: number): ReadonlyArray<string> | undefined {
+  if (event === 'cnsSelect') return ['E2', 'B2', 'G3', 'E3'];
+  const tones = CNS_STINGER_CHORDS[((bar % 4) + 4) % 4];
+  const shapes: Partial<Record<MusicEvent, ReadonlyArray<string>>> = {
+    waveStart: [tones[0], tones[1], tones[2]], waveClear: [tones[2], tones[1], tones[0]],
+    leak: [tones[2], tones[0]], warning: [tones[0], tones[1], tones[2]],
+    toci: [tones[1], tones[2]], dexa: [tones[2], tones[0]], stemcell: [tones[0], tones[2]],
+    iecHsOnset: [tones[0], tones[1], tones[2], tones[0]], anakinra: [tones[1], tones[0]],
+    gcsf: [tones[0], tones[2], tones[1]], victory: [tones[0], tones[1], tones[2], 'E4'],
+    loss: [tones[2], tones[1], tones[0]], bossPhase2: [tones[0], tones[2], tones[1]],
+    bossPhase3: [tones[0], tones[1], tones[2], 'E4'], shieldBreak: [tones[0], tones[2], 'E4'],
   };
   return shapes[event];
 }
@@ -591,6 +690,7 @@ function sameHepaticProfile(a: HepaticWaveProfile, b: HepaticWaveProfile): boole
 
 export function arrangementFor(level: LevelId, scene: MusicScene): SceneArrangement {
   if (level === 'liver') return HEPATIC_ARRANGEMENTS[scene] ?? ARRANGEMENTS[scene === 'boss' ? 'wave' : scene];
+  if (level === 'cns') return CNS_ARRANGEMENTS[scene] ?? ARRANGEMENTS[scene === 'boss' ? 'wave' : scene];
   return ARRANGEMENTS[scene === 'boss' ? 'wave' : scene];
 }
 
@@ -614,6 +714,17 @@ export const HEPATIC_VOICES: Partial<Record<Exclude<Layer, 'drums' | 'texture'>,
   brass: { attack: 0.035, release: 0.42, cutoff: 1550, resonance: 3.8, gain: 0.04 },
   strings: { attack: 0.24, release: 1.1, cutoff: 1750, resonance: 1.2, gain: 0.028 },
   solo: { attack: 0.01, release: 0.28, cutoff: 3400, resonance: 2.9, gain: 0.085 },
+};
+
+export const CNS_VOICES: Partial<Record<Exclude<Layer, 'drums' | 'texture'>, VoiceDefinition>> = {
+  bass: { attack: .003, release: .16, cutoff: 520, resonance: 5.2, gain: .19 },
+  pad: { attack: .42, release: 1.35, cutoff: 1250, resonance: 1.7, gain: .04 },
+  lead: { attack: .01, release: .34, cutoff: 3900, resonance: 3.4, gain: .09 },
+  counter: { attack: .004, release: .12, cutoff: 2800, resonance: 5.4, gain: .032 },
+  arp: { attack: .003, release: .065, cutoff: 3400, resonance: 5.8, gain: .02 },
+  brass: { attack: .025, release: .46, cutoff: 1200, resonance: 4.4, gain: .045 },
+  strings: { attack: .3, release: 1.2, cutoff: 1500, resonance: 1.5, gain: .028 },
+  solo: { attack: .012, release: .38, cutoff: 3600, resonance: 3.8, gain: .09 },
 };
 
 export function noteFrequency(note: string): number {
@@ -769,19 +880,20 @@ export class Music {
       loss: ['E4', 'C4', 'A3'],
     };
     const hepaticCue = event === 'hepaticSelect' || (this.level === 'liver' && this.scene !== 'menu');
-    if (hepaticCue && event === 'waveStart') this.pendingWaveTransition = 'start';
-    if (hepaticCue && event === 'waveClear') this.pendingWaveTransition = 'clear';
-    const spacing = hepaticCue ? 0.085 : 0.055;
-    const sequence = hepaticCue ? hepaticStinger(event, Math.floor(this.step / STEPS_PER_BAR)) ?? [] : notes[event] ?? [];
+    const cnsCue = event === 'cnsSelect' || (this.level === 'cns' && this.scene !== 'menu');
+    if ((hepaticCue || cnsCue) && event === 'waveStart') this.pendingWaveTransition = 'start';
+    if ((hepaticCue || cnsCue) && event === 'waveClear') this.pendingWaveTransition = 'clear';
+    const spacing = hepaticCue || cnsCue ? 0.085 : 0.055;
+    const sequence = hepaticCue ? hepaticStinger(event, Math.floor(this.step / STEPS_PER_BAR)) ?? [] : cnsCue ? cnsStinger(event, Math.floor(this.step / STEPS_PER_BAR)) ?? [] : notes[event] ?? [];
     const cuePan = Math.max(-0.75, Math.min(0.75, options.pan ?? 0));
     sequence.forEach((note, i) => {
-      const pan = hepaticCue ? cuePan : i % 2 ? 0.35 : -0.35;
-      this.tone('counter', noteFrequency(note), now + i * spacing, 0.24 + i * 0.025, pan, hepaticCue ? 0.86 : 1.15);
+      const pan = hepaticCue || cnsCue ? cuePan : i % 2 ? 0.35 : -0.35;
+      this.tone('counter', noteFrequency(note), now + i * spacing, 0.24 + i * 0.025, pan, hepaticCue || cnsCue ? 0.86 : 1.15);
     });
     if (event === 'flareImpact' || event === 'bossPhase2' || event === 'bossPhase3') {
       this.kick(now, true);
       this.tom(now + 0.08, true);
-      const impactRoot = hepaticStinger(event, Math.floor(this.step / STEPS_PER_BAR))?.[0] ?? 'F#2';
+      const impactRoot = (cnsCue ? cnsStinger(event, Math.floor(this.step / STEPS_PER_BAR)) : hepaticStinger(event, Math.floor(this.step / STEPS_PER_BAR)))?.[0] ?? (cnsCue ? 'E2' : 'F#2');
       this.tone('brass', noteFrequency(impactRoot), now, 0.7, cuePan, 1.12);
     }
   }
@@ -804,6 +916,7 @@ export class Music {
   previewLevel(level: LevelId): void {
     this.level = level;
     if (level === 'liver') this.trigger('hepaticSelect');
+    if (level === 'cns') this.trigger('cnsSelect');
   }
 
   startLevel(level: LevelId): void {
@@ -978,7 +1091,9 @@ export class Music {
     const variation = variationIndex(bar);
     const continuousHepatic = this.level === 'liver'
       && this.scene !== 'menu' && this.scene !== 'victory' && this.scene !== 'loss';
-    const density = continuousHepatic ? 1 : Math.min(
+    const continuousCns = this.level === 'cns'
+      && this.scene !== 'menu' && this.scene !== 'victory' && this.scene !== 'loss';
+    const density = continuousHepatic || continuousCns ? 1 : Math.min(
       1,
       arrangement.density * (0.72 + this.intensity * 0.38) + this.hepaticEventPressure * 0.1,
     );
@@ -1008,9 +1123,9 @@ export class Music {
       'bass',
       noteFrequency(bass),
       time,
-      stepDuration * (this.level === 'liver' && (this.scene === 'wave' || this.scene === 'danger' || this.scene === 'boss') ? .82 : 2.6),
+      stepDuration * ((this.level === 'liver' || this.level === 'cns') && (this.scene === 'wave' || this.scene === 'danger' || this.scene === 'boss') ? .82 : 2.6),
       -0.12,
-      Math.max(0.58, brightness) * (this.level === 'liver' ? 1.16 : 1),
+      Math.max(0.58, brightness) * (this.level === 'liver' ? 1.16 : this.level === 'cns' ? 1.1 : 1),
       level('bass'),
       filterScale,
     );
@@ -1067,7 +1182,8 @@ export class Music {
     const bus = this.layerBuses[layer];
     if (!ctx || !bus || frequency <= 0 || this.activeVoices >= VOICE_LIMIT) return;
     const hepaticPlayback = this.level === 'liver' && this.scene !== 'menu';
-    const def = hepaticPlayback ? HEPATIC_VOICES[layer] ?? VOICES[layer] : VOICES[layer];
+    const cnsPlayback = this.level === 'cns' && this.scene !== 'menu';
+    const def = hepaticPlayback ? HEPATIC_VOICES[layer] ?? VOICES[layer] : cnsPlayback ? CNS_VOICES[layer] ?? VOICES[layer] : VOICES[layer];
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     const panner = ctx.createStereoPanner();
@@ -1078,7 +1194,7 @@ export class Music {
     gain.gain.setValueAtTime(0.0001, time);
     gain.gain.exponentialRampToValueAtTime(def.gain * velocity * level, time + def.attack);
     gain.gain.setTargetAtTime(0.0001, Math.max(time + def.attack, time + duration - def.release), Math.max(0.015, def.release / 4));
-    const driven = hepaticPlayback
+    const driven = (hepaticPlayback || cnsPlayback)
       && (this.scene === 'wave' || this.scene === 'danger' || this.scene === 'boss')
       && (layer === 'bass' || layer === 'solo');
     const saturation = driven ? ctx.createWaveShaper() : null;
@@ -1099,6 +1215,10 @@ export class Music {
       bass: ['triangle', 'sawtooth'], pad: ['sawtooth', 'triangle'],
       lead: ['sawtooth', 'square'], counter: ['triangle', 'sine'], arp: ['triangle', 'square'],
       brass: ['sawtooth', 'triangle'], strings: ['triangle', 'sine'], solo: ['triangle', 'sawtooth'],
+    } : cnsPlayback ? {
+      bass: ['square', 'triangle'], pad: ['sawtooth', 'sine'], lead: ['sawtooth', 'square'],
+      counter: ['square', 'triangle'], arp: ['square', 'triangle'], brass: ['sawtooth', 'square'],
+      strings: ['triangle', 'sine'], solo: ['sawtooth', 'triangle'],
     } : {
       bass: ['triangle', 'sawtooth'], pad: ['sine', 'triangle'],
       lead: ['sawtooth', 'square'], counter: ['sine', 'triangle'], arp: ['triangle', 'square'],
@@ -1113,8 +1233,8 @@ export class Music {
       const oscillator = ctx.createOscillator();
       oscillator.type = wave;
       oscillator.frequency.setValueAtTime(glideFrom || frequency, time);
-      if (glideFrom) oscillator.frequency.exponentialRampToValueAtTime(frequency, time + (layer === 'solo' ? .055 : hepaticPlayback ? .065 : .045));
-      const spread = hepaticPlayback && layer === 'solo' ? 7 : hepaticPlayback && layer === 'pad' ? 11 : hepaticPlayback && layer === 'lead' ? 7 : hepaticPlayback ? 3 : 5;
+      if (glideFrom) oscillator.frequency.exponentialRampToValueAtTime(frequency, time + (layer === 'solo' ? .055 : hepaticPlayback || cnsPlayback ? .065 : .045));
+      const spread = (hepaticPlayback || cnsPlayback) && layer === 'solo' ? 7 : (hepaticPlayback || cnsPlayback) && layer === 'pad' ? 11 : (hepaticPlayback || cnsPlayback) && layer === 'lead' ? 7 : hepaticPlayback || cnsPlayback ? 3 : 5;
       oscillator.detune.value = i === 0 ? -spread : i === 1 ? spread : 0;
       oscillator.connect(filter);
       oscillator.start(time);
@@ -1158,13 +1278,13 @@ export class Music {
     const ctx = this.ctx;
     const bus = this.layerBuses.drums;
     if (!ctx || !bus || this.activeVoices >= VOICE_LIMIT) return;
-    if (this.level === 'liver' && this.scene !== 'menu') this.pumpTonalLayers(time, strong);
+    if ((this.level === 'liver' || this.level === 'cns') && this.scene !== 'menu') this.pumpTonalLayers(time, strong);
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(strong ? 145 : 110, time);
     oscillator.frequency.exponentialRampToValueAtTime(48, time + 0.13);
-    const hepaticPunch = this.level === 'liver' ? 1.12 : 1;
+    const hepaticPunch = this.level === 'liver' ? 1.12 : this.level === 'cns' ? 1.08 : 1;
     gain.gain.setValueAtTime((strong ? 0.34 : 0.22) * hepaticPunch * level, time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18);
     oscillator.connect(gain); gain.connect(bus);
@@ -1189,7 +1309,7 @@ export class Music {
     const filter = ctx.createBiquadFilter();
     const gain = ctx.createGain();
     source.buffer = this.noise();
-    const hepaticGate = this.level === 'liver' && this.scene !== 'menu';
+    const hepaticGate = (this.level === 'liver' || this.level === 'cns') && this.scene !== 'menu';
     filter.type = 'bandpass'; filter.frequency.value = hepaticGate ? 1500 : 1800; filter.Q.value = hepaticGate ? 0.55 : 0.7;
     gain.gain.setValueAtTime((strong ? (hepaticGate ? .25 : .18) : (hepaticGate ? .15 : .11)) * level, time);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + (hepaticGate ? .34 : .16));
@@ -1204,7 +1324,7 @@ export class Music {
     const bus = this.layerBuses.drums;
     if (!ctx || !bus || this.activeVoices >= VOICE_LIMIT) return;
     const oscillator = ctx.createOscillator();
-    const metallic = this.level === 'liver' && this.scene !== 'menu' ? ctx.createOscillator() : null;
+    const metallic = (this.level === 'liver' || this.level === 'cns') && this.scene !== 'menu' ? ctx.createOscillator() : null;
     const metallicGain = metallic ? ctx.createGain() : null;
     const gain = ctx.createGain();
     oscillator.type = metallic ? 'triangle' : 'sine';

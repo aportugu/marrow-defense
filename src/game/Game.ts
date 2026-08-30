@@ -15,7 +15,7 @@ import { ABILITY, UNIT } from './Balance';
 import { createInitialState, startGame } from './GameState';
 import { buildPaths, guidedPlacementFailure, placementFailure, type PathDef } from '../lib/path';
 import { stepTowers, stepProjectiles, stepEnemies } from '../systems/CombatSystem';
-import { stepWave, startWave } from '../systems/WaveSystem';
+import { containCnsBreach, stepWave, startWave } from '../systems/WaveSystem';
 import { stepMeters, checkEnd } from '../systems/MeterSystem';
 import { stepAbilities, activate, canActivate } from '../systems/AbilitySystem';
 import { computeScore, type ScoreResult } from '../systems/ScoringSystem';
@@ -80,6 +80,7 @@ export class Game {
   private introStartedAt = 0;
   private lastIntroCueId: string | null = null;
   private lastHepaticCueSerial = 0;
+  private lastCnsCueSerial = 0;
 
   constructor(canvas: HTMLCanvasElement | null = null, cb: GameCallbacks = {}) {
     this.canvas = canvas ?? document.createElement('canvas');
@@ -148,10 +149,12 @@ export class Game {
         gcsfSupport: s.stats.time < s.gcsfUntil,
         reducedMotion: this.settings.reducedMotion,
         level: s.level,
-        bossActive: s.enemies.some((enemy) => enemy.alive && enemy.type === 'hepaticCore'),
-        bossDefeated: s.stats.killsByType.hepaticCore > 0,
+        bossActive: s.enemies.some((enemy) => enemy.alive && (enemy.type === 'hepaticCore' || enemy.type === 'parenchymalCore')),
+        bossDefeated: s.stats.killsByType.hepaticCore > 0 || s.stats.killsByType.parenchymalCore > 0,
         activeHepaticEvent: s.activeHepaticEvent,
-        bossPhase: s.enemies.find((enemy) => enemy.alive && enemy.type === 'hepaticCore')?.bossPhase ?? 0,
+        activeCnsBreaches: s.activeCnsBreaches,
+        cnsBurden: s.meters.cnsBurden,
+        bossPhase: s.enemies.find((enemy) => enemy.alive && (enemy.type === 'hepaticCore' || enemy.type === 'parenchymalCore'))?.bossPhase ?? 0,
       },
     });
   }
@@ -188,6 +191,7 @@ export class Game {
     stepMeters(s, dt);
     stepWave(s, dt, this.paths);
     this.syncHepaticCue();
+    this.syncCnsCue();
     if (subPhaseBefore === 'planning' && s.subPhase === 'wave') {
       if (s.onboarding.active) {
         s.onboarding.hint = 'monitorWave';
@@ -258,6 +262,8 @@ export class Game {
     if (m.neuro >= 100) return 'Irreversible neurotoxicity silenced the nervous system.';
     if (m.hyperinflammation >= 100) return 'IEC-HS hyperinflammation progressed to critical organ stress.';
     if (m.fitness <= 0) return 'The patient lost all fitness — the body gave up.';
+    if (m.cnsBurden >= 100) return 'Malignant CNS disease burden reached the critical threshold.';
+    if (this.state.level === 'cns') return 'The neuroaxis was overrun.';
     return this.state.level === 'liver' ? 'The liver was overrun.' : 'The marrow was overrun.';
   }
 
@@ -293,6 +299,7 @@ export class Game {
     this.neuroWarned = false;
     this.iecHsWasActive = false;
     this.lastHepaticCueSerial = 0;
+    this.lastCnsCueSerial = 0;
     this.music.startLevel(level);
     this.music.unlock();
     this.sound.ensure();
@@ -311,6 +318,7 @@ export class Game {
     this.lastEscapes = 0;
     this.iecHsWasActive = false;
     this.lastHepaticCueSerial = 0;
+    this.lastCnsCueSerial = 0;
     this.introStartedAt = this.visualTime;
     this.lastIntroCueId = null;
     this.music.restartMenu();
@@ -418,6 +426,16 @@ export class Game {
     this.music.trigger('waveStart');
   }
 
+  containCnsBreach(eventId: number): boolean {
+    const contained = containCnsBreach(this.state, eventId);
+    if (!contained) return false;
+    this.sound.place();
+    this.music.trigger('warning');
+    this.kinetic.pushEvent('containment', this.visualTime);
+    this.cb.onNotice?.({ text: 'Interface contained — breach delayed and reduced', level: 'info' });
+    return true;
+  }
+
   setCursor(x: number, y: number, on: boolean): void {
     this.cursor = on ? { x, y } : null;
   }
@@ -438,6 +456,21 @@ export class Game {
     if (cue.kind === 'flareWarn') this.cb.onNotice?.({ text: `PLASMA-CELL SURGE — ${lane}`, level: 'critical' });
     const impacts = cue.kind === 'flareImpact' || cue.kind === 'bossPhase2' || cue.kind === 'bossPhase3' || cue.kind === 'shieldBreak';
     if (impacts) this.punch(cue.kind === 'bossPhase3' ? 11 : 7);
+  }
+
+  private syncCnsCue(): void {
+    const cue = this.state.cnsCue;
+    if (!cue || cue.serial === this.lastCnsCueSerial) return;
+    this.lastCnsCueSerial = cue.serial;
+    const pan = [-0.55, 0, 0.55][cue.lane] ?? 0;
+    if (cue.kind === 'breachWarn') this.music.trigger('warning', { pan });
+    else if (cue.kind === 'breachImpact') this.music.trigger('waveStart', { pan });
+    else if (cue.kind === 'corePhase2') this.music.trigger('bossPhase2', { pan });
+    else if (cue.kind === 'corePhase3') this.music.trigger('bossPhase3', { pan });
+    else this.music.trigger('waveClear', { pan });
+    this.kinetic.pushEvent(cue.kind, this.visualTime);
+    if (cue.kind === 'breachWarn') this.cb.onNotice?.({ text: 'CNS INTERFACE BREACH INCOMING', level: 'critical' });
+    if (cue.kind === 'breachImpact' || cue.kind === 'corePhase2' || cue.kind === 'corePhase3') this.punch(cue.kind === 'corePhase3' ? 11 : 7);
   }
 
   private syncMusic(dt: number): void {
@@ -481,7 +514,7 @@ export class Game {
       this.neuroWarned = false;
     }
     const waveT = (s.wave - 1) / Math.max(1, s.wavesTotal - 1);
-    const bossPhase = s.enemies.find((enemy) => enemy.alive && enemy.type === 'hepaticCore')?.bossPhase ?? 0;
+    const bossPhase = s.enemies.find((enemy) => enemy.alive && (enemy.type === 'hepaticCore' || enemy.type === 'parenchymalCore'))?.bossPhase ?? 0;
     const hepaticPressure = s.activeHepaticEvent ? .18 : bossPhase ? bossPhase * .09 : 0;
     const battle = Math.min(1, 0.2 + 0.45 * waveT + 0.3 * (s.meters.crs / 100) + 0.3 * (s.meters.neuro / 100) + 0.25 * (s.meters.hematotoxicity / 100) + 0.45 * this.heat + 0.2 * (this.settings.speed - 1) + hepaticPressure);
     let scene: MusicScene;
@@ -489,7 +522,7 @@ export class Game {
     else if (p === 'paused') scene = 'paused';
     else if (p === 'won') scene = 'victory';
     else if (p === 'lost') scene = 'loss';
-    else if (s.level === 'liver' && bossPhase > 0) scene = 'boss';
+    else if ((s.level === 'liver' || s.level === 'cns') && bossPhase > 0) scene = 'boss';
     else if (s.iecHsActive) scene = 'iecHs';
     else scene = s.subPhase === 'wave' ? 'wave' : 'planning';
     this.music.update({

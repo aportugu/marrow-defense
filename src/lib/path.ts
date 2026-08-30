@@ -85,9 +85,38 @@ function buildLiverPaths(): PathDef[] {
   });
 }
 
+export const CNS_ROUTE_STRUCTURES = [
+  ['Cerebral microvasculature', 'blood–brain barrier', 'penetrating cortical vessel', 'perivascular space', 'periventricular white matter'],
+  ['Choroid plexus', 'lateral ventricle', 'foramen of Monro', 'third ventricle', 'cerebral aqueduct', 'fourth ventricle', 'median and lateral apertures', 'basal cisterns'],
+  ['Pial vessels', 'cerebral subarachnoid space', 'basal cisterns', 'foramen magnum', 'spinal subarachnoid space', 'lumbar cistern', 'cauda equina'],
+] as const;
+
+function buildCnsPaths(): PathDef[] {
+  return [
+    makePath([
+      { x: -50, y: 150 }, { x: 120, y: 146 }, { x: 245, y: 165 },
+      { x: 360, y: 205 }, { x: 485, y: 245 }, { x: 620, y: 280 },
+      { x: 760, y: 300 }, { x: 900, y: 330 }, { x: 1060, y: 350 }, { x: 1330, y: 378 },
+    ]),
+    makePath([
+      { x: -50, y: 300 }, { x: 120, y: 292 }, { x: 260, y: 305 },
+      { x: 390, y: 325 }, { x: 500, y: 344 }, { x: 590, y: 360 },
+      { x: 680, y: 390 }, { x: 760, y: 425 }, { x: 850, y: 455 },
+      { x: 965, y: 470 }, { x: 1110, y: 492 }, { x: 1330, y: 520 },
+    ]),
+    makePath([
+      { x: -50, y: 82 }, { x: 130, y: 90 }, { x: 285, y: 102 },
+      { x: 455, y: 112 }, { x: 625, y: 135 }, { x: 790, y: 180 },
+      { x: 900, y: 245 }, { x: 965, y: 315 }, { x: 1015, y: 400 },
+      { x: 1060, y: 500 }, { x: 1130, y: 590 }, { x: 1330, y: 640 },
+    ]),
+  ];
+}
+
 export function buildPaths(level: LevelId): PathDef[] {
   if (level === 'marrow') return [buildPath()];
-  return buildLiverPaths();
+  if (level === 'liver') return buildLiverPaths();
+  return buildCnsPaths();
 }
 
 // Position (and implicit heading) at distance `d` along the path.

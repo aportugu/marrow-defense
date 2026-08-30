@@ -28,8 +28,8 @@ for (const viewport of landscapePhones) {
     expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(viewport.height + 1);
 
     const actions = page.locator('.start-card .menu-actions .btn');
-    await expect(actions).toHaveCount(4);
-    for (let index = 0; index < 4; index += 1) await expect(actions.nth(index)).toBeInViewport();
+    await expect(actions).toHaveCount(5);
+    for (let index = 0; index < 5; index += 1) await expect(actions.nth(index)).toBeInViewport();
     const secondary = await actions.evaluateAll((buttons) => buttons.slice(1).map((button) => {
       const rect = button.getBoundingClientRect(); return { width: rect.width, height: rect.height };
     }));
@@ -39,6 +39,21 @@ for (const viewport of landscapePhones) {
     const stage = await page.locator('.opening-menu > .stage').boundingBox();
     expect(stage).not.toBeNull();
     expect(stage!.x + stage!.width - (cardBox!.x + cardBox!.width)).toBeGreaterThan(viewport.width * 0.35);
+
+    await page.getByRole('button', { name: 'CNS Atlas', exact: true }).click();
+    const atlas = page.locator('.atlas-card');
+    await expect(atlas).toContainText('CNS barriers and interfaces');
+    for (const heading of ['CNS barriers and interfaces', 'Ventricular and craniospinal CSF anatomy', 'CNS myeloma compartments', 'Disease, ICANS, and abstractions']) {
+      await expect(atlas.getByRole('heading', { level: 1 })).toHaveText(heading);
+      const atlasBox = await atlas.boundingBox();
+      expect(atlasBox).not.toBeNull();
+      expect(atlasBox!.x + atlasBox!.width).toBeLessThanOrEqual(viewport.width * .55 + 1);
+      expect(atlasBox!.y + atlasBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+      const next = page.getByRole('button', { name: 'Next', exact: true });
+      if (await next.isVisible()) await next.click();
+    }
+    await expect(atlas).toContainText('tactical gameplay abstraction');
+    await page.getByRole('button', { name: 'Back to menu' }).click();
 
     await page.getByRole('button', { name: 'Tutorial', exact: true }).click();
     const tutorial = page.locator('.tutorial-card');
@@ -131,7 +146,7 @@ test('guided reinforcement pauses wave 2 in the iPhone top HUD', async ({ page }
   await page.keyboard.press('q');
   await canvasPoint(350, 370);
   await expect(page.locator('.guided-hint')).toContainText('3/5 · START THE WAVE');
-  await page.getByRole('button', { name: 'Start now' }).click();
+  await page.keyboard.press(' ');
   await page.locator('.hud-right .btn').first().click();
   await page.locator('.hud-right .btn').first().click();
 
@@ -175,4 +190,29 @@ test('desktop retains menu and battlefield geometry', async ({ page }) => {
   expect(gameStage && canvas).toBeTruthy();
   expect(Math.abs(gameStage!.width / gameStage!.height - 16 / 9)).toBeLessThan(0.03);
   expect(Math.abs(canvas!.width - gameStage!.width)).toBeLessThanOrEqual(2);
+});
+
+test('Neuroaxis keeps CNS status and containment in the iPhone top HUD', async ({ page }) => {
+  const viewport = { width: 844, height: 390 };
+  await page.setViewportSize(viewport);
+  await openMainMenu(page);
+  await page.evaluate(() => localStorage.setItem('marrow-defense:settings', JSON.stringify({ tutorialSeen: true, speed: 3 })));
+  await page.reload();
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: /Neuroaxis EXPERT/ }).click();
+  await page.getByRole('button', { name: 'Start Neuroaxis — Expert' }).click();
+  await page.keyboard.press(' ');
+  await expect(page.getByRole('button', { name: /Contain cortical bbb entry/i })).toBeVisible({ timeout: 5_000 });
+  const [cnsHud, hud, stage, units, abilities] = await Promise.all([
+    page.locator('.cns-hud').boundingBox(), page.locator('.hud').boundingBox(), page.locator('.stage').boundingBox(),
+    page.locator('.units').boundingBox(), page.locator('.abilities').boundingBox(),
+  ]);
+  expect(cnsHud && hud && stage && units && abilities).toBeTruthy();
+  expect(cnsHud!.y).toBeGreaterThanOrEqual(hud!.y - 1);
+  expect(cnsHud!.y + cnsHud!.height).toBeLessThanOrEqual(hud!.y + hud!.height + 1);
+  expect(units!.x + units!.width).toBeLessThanOrEqual(stage!.x + 1);
+  expect(abilities!.x).toBeGreaterThanOrEqual(stage!.x + stage!.width - 1);
+  await expect(page.locator('.banner')).toBeHidden();
+  await page.keyboard.press('r');
+  await expect(page.locator('.cns-hud')).toContainText('DELAYED');
 });

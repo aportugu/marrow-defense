@@ -1,5 +1,5 @@
 import { CANVAS_H, CANVAS_W } from './types';
-import type { ActiveHepaticEvent, GamePhase, SubPhase, LevelId } from './types';
+import type { ActiveCnsBreach, ActiveHepaticEvent, GamePhase, SubPhase, LevelId } from './types';
 import { mulberry32 } from '../lib/rng';
 import { posAt, type PathDef } from '../lib/path';
 
@@ -19,7 +19,13 @@ export type KineticEventKind =
   | 'obstruction'
   | 'shieldBreak'
   | 'bossPhase2'
-  | 'bossPhase3';
+  | 'bossPhase3'
+  | 'breachWarn'
+  | 'breachImpact'
+  | 'containment'
+  | 'deposit'
+  | 'corePhase2'
+  | 'corePhase3';
 
 export interface KineticSignals {
   phase: GamePhase;
@@ -39,7 +45,59 @@ export interface KineticSignals {
   bossActive: boolean;
   bossDefeated: boolean;
   activeHepaticEvent: ActiveHepaticEvent | null;
+  activeCnsBreaches: ActiveCnsBreach[];
+  cnsBurden: number;
   bossPhase: number;
+}
+
+function drawCnsAnatomy(ctx: CanvasRenderingContext2D, t: number, signals: KineticSignals): void {
+  ctx.save();
+  const tissue = ctx.createLinearGradient(100, 60, 1040, 610);
+  tissue.addColorStop(0, 'rgba(35,55,84,.92)');
+  tissue.addColorStop(.55, 'rgba(24,35,62,.94)');
+  tissue.addColorStop(1, 'rgba(10,19,38,.97)');
+  ctx.fillStyle = tissue;
+  ctx.strokeStyle = 'rgba(148,197,255,.3)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(120, 338);
+  ctx.bezierCurveTo(90, 190, 210, 68, 430, 54);
+  ctx.bezierCurveTo(650, 38, 865, 132, 904, 284);
+  ctx.bezierCurveTo(928, 380, 866, 474, 735, 500);
+  ctx.bezierCurveTo(595, 548, 390, 526, 236, 468);
+  ctx.bezierCurveTo(166, 438, 128, 394, 120, 338);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Corpus callosum/ventricular complex: a restrained midsagittal clinical underlay.
+  ctx.strokeStyle = 'rgba(186,230,253,.38)';
+  ctx.lineWidth = 16;
+  ctx.beginPath(); ctx.arc(505, 278, 132, Math.PI * 1.08, Math.PI * 1.88); ctx.stroke();
+  ctx.strokeStyle = 'rgba(56,189,248,.68)';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(420, 306); ctx.bezierCurveTo(500, 265, 584, 284, 624, 336);
+  ctx.lineTo(686, 372); ctx.lineTo(742, 415); ctx.lineTo(820, 446); ctx.stroke();
+
+  // Separately scaled spinal inset, connected at the foramen magnum.
+  ctx.setLineDash([7, 7]);
+  ctx.strokeStyle = 'rgba(203,213,225,.36)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(956, 316, 244, 334);
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(8,18,35,.78)'; ctx.fillRect(958, 318, 240, 330);
+  ctx.strokeStyle = 'rgba(167,139,250,.55)'; ctx.lineWidth = 20;
+  ctx.beginPath(); ctx.moveTo(1030, 340); ctx.bezierCurveTo(1035, 430, 1058, 520, 1110, 615); ctx.stroke();
+  ctx.strokeStyle = 'rgba(125,211,252,.45)'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(1030, 340); ctx.bezierCurveTo(1035, 430, 1058, 520, 1110, 615); ctx.stroke();
+  const pulse = signals.reducedMotion ? .35 : .2 + .15 * (1 + Math.sin(t * 2.1));
+  ctx.fillStyle = `rgba(96,165,250,${pulse})`;
+  ctx.fillRect(960, 320, 236, 326);
+  if (signals.cnsBurden > 0) {
+    ctx.fillStyle = `rgba(232,121,249,${Math.min(.16, signals.cnsBurden / 700)})`;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }
+  ctx.restore();
 }
 
 export interface KineticDescriptor {
@@ -216,6 +274,12 @@ const EVENT_COLOR: Record<KineticEventKind, string> = {
   shieldBreak: '103,232,249',
   bossPhase2: '217,70,239',
   bossPhase3: '255,255,255',
+  breachWarn: '251,113,133',
+  breachImpact: '56,189,248',
+  containment: '134,239,172',
+  deposit: '192,132,252',
+  corePhase2: '232,121,249',
+  corePhase3: '255,255,255',
 };
 
 export function createKineticDescriptors(count: number, seed = 0x4d415252): KineticDescriptor[] {
@@ -261,6 +325,9 @@ export class KineticBackground {
       if (level === 'liver') {
         base.addColorStop(0, '#0e2430');
         base.addColorStop(1, '#07141b');
+      } else if (level === 'cns') {
+        base.addColorStop(0, '#10233d');
+        base.addColorStop(1, '#050b18');
       } else {
         base.addColorStop(0, '#2a0f1c');
         base.addColorStop(1, '#160610');
@@ -270,6 +337,7 @@ export class KineticBackground {
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     if (level === 'liver') drawHepaticAnatomy(ctx, signals.reducedMotion ? 0 : time, signals);
+    if (level === 'cns') drawCnsAnatomy(ctx, signals.reducedMotion ? 0 : time, signals);
     const lanePath = (i: number): PathDef =>
       paths[((i % paths.length) + paths.length) % paths.length];
 
@@ -288,7 +356,7 @@ export class KineticBackground {
       CANVAS_W / 2, CANVAS_H / 2, 25,
       CANVAS_W / 2, CANVAS_H / 2, 600,
     );
-    const glowRgb = level === 'liver' ? '90,167,201' : '176,67,214';
+    const glowRgb = level === 'liver' ? '90,167,201' : level === 'cns' ? '96,165,250' : '176,67,214';
     glow.addColorStop(0, `rgba(${glowRgb},${0.07 + breath * (menu ? 0.08 : 0.035)})`);
     glow.addColorStop(1, `rgba(${glowRgb},0)`);
     ctx.fillStyle = glow;
@@ -302,6 +370,7 @@ export class KineticBackground {
       ctx.globalAlpha = menu ? 0.07 : 0.035;
       ctx.fillStyle = level === 'liver'
         ? (i % 2 ? '#7f1d35' : '#4c1726')
+        : level === 'cns' ? (i % 2 ? '#1e3a5f' : '#172554')
         : (i % 2 ? '#7a1f5c' : '#4b1837');
       ctx.beginPath();
       ctx.ellipse(x, y, 18 + d.size * 5, 10 + d.size * 3, d.phase, 0, Math.PI * 2);

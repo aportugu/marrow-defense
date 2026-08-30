@@ -101,8 +101,8 @@ export function saveHighScore(n: number): number {
 
 export function defaultProgress(): Progress {
   return {
-    cleared: { marrow: false, liver: false },
-    best: { marrow: null, liver: null },
+    cleared: { marrow: false, liver: false, cns: false },
+    best: { marrow: null, liver: null, cns: null },
   };
 }
 
@@ -144,10 +144,12 @@ export function loadProgress(): Progress {
         cleared: {
           marrow: stored.cleared?.marrow === true,
           liver: stored.cleared?.liver === true,
+          cns: stored.cleared?.cns === true,
         },
         best: {
           marrow: normalizeBest(storedBest.marrow),
           liver: normalizeBest(storedBest.liver),
+          cns: normalizeBest(storedBest.cns),
         },
       };
     }
@@ -162,10 +164,12 @@ export function saveProgress(p: Progress): Progress {
     cleared: {
       marrow: p.cleared.marrow || false,
       liver: p.cleared.liver || false,
+      cns: p.cleared.cns || false,
     },
     best: {
       marrow: normalizeBest(p.best.marrow),
       liver: normalizeBest(p.best.liver),
+      cns: normalizeBest(p.best.cns),
     },
   };
   if (!hasLS()) return next;

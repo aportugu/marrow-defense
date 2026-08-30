@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GLOSSARY, REFERENCES, WAVE_TITLES } from './education';
 
 describe('clinical glossary data', () => {
-  it('labels the show-don’t-tell milestone waves for both levels', () => {
+  it('labels the show-don’t-tell milestone waves for every level', () => {
     expect(WAVE_TITLES.marrow).toEqual({
       1: 'Target Engagement', 3: 'High Disease Burden', 4: 'Antigen Escape',
       6: 'Toxicity Divergence', 8: 'Persistence', 9: 'Hyperinflammatory Shift',
@@ -13,11 +13,12 @@ describe('clinical glossary data', () => {
       7: 'Biliary Obstruction', 9: 'Extramedullary Persistence',
       10: 'Hepatic Clearance',
     });
+    expect(WAVE_TITLES.cns[10]).toBe('Parenchymal Core');
   });
 
   it('provides a compact cited glossary including IEC-HS and limitations', () => {
     expect(GLOSSARY.map((entry) => entry.term)).toEqual([
-      'BCMA', 'Antigen escape', 'CRS', 'ICANS', 'Persistence', 'Hematotoxicity / ICAHT', 'G-CSF support', 'IEC-HS', 'Extramedullary plasmacytoma', 'IMWG response categories', 'Simulation limitations',
+      'BCMA', 'Antigen escape', 'CRS', 'ICANS', 'Persistence', 'Hematotoxicity / ICAHT', 'G-CSF support', 'IEC-HS', 'Extramedullary plasmacytoma', 'CNS myeloma relapse', 'Blood–brain barrier (BBB)', 'Blood–CSF barrier', 'Leptomeningeal compartment', 'IMWG response categories', 'Simulation limitations',
     ]);
     for (const entry of GLOSSARY) {
       expect(entry.summary.length).toBeGreaterThan(40);

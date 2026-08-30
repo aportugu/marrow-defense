@@ -38,12 +38,13 @@ export function computeScore(s: GameState): ScoreResult {
   const w = SCORING.weights;
   const level = LEVELS[s.level];
   const norm = (v: number, cap: number) => clamp(v / cap, 0, 1);
+  const diseaseBurden = s.level === 'cns' ? m.burden * .45 + m.cnsBurden * .55 : m.burden;
 
   const parts: Record<string, number> = {
     hematotoxicity: Math.round(
       norm(100 - (m.hematotoxicity * 0.6 + st.peakHematotoxicity * 0.4), 100) * w.hematotoxicity,
     ),
-    burden: Math.round(norm(100 - m.burden, 100) * w.burden),
+    burden: Math.round(norm(100 - diseaseBurden, 100) * w.burden),
     fitness: Math.round(norm(st.lowestFitness, 100) * w.fitness),
     crs: Math.round(norm(100 - st.peakCrs, 100) * w.crs),
     neuro: Math.round(norm(100 - st.peakNeuro, 100) * w.neuro),
@@ -51,7 +52,7 @@ export function computeScore(s: GameState): ScoreResult {
     currency: Math.round(norm(s.currency, SCORING.caps.currency) * w.currency),
     time: Math.round(norm(level.scoreTimeTarget - st.time, level.scoreTimeTarget) * w.time),
     precision:
-      m.fitness <= 0 || m.crs >= 100 || m.neuro >= 100 || m.hyperinflammation >= 100
+      m.fitness <= 0 || m.crs >= 100 || m.neuro >= 100 || m.hyperinflammation >= 100 || m.cnsBurden >= 100
         ? 0
         : Math.round(norm(10 - st.escapes, 10) * w.precision),
   };

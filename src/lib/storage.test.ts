@@ -61,15 +61,16 @@ describe('level response persistence', () => {
   it('migrates numeric level bests to response records', () => {
     const storage = new MemoryStorage();
     storage.setItem('marrow-defense:progress', JSON.stringify({
-      cleared: { marrow: true, liver: false },
+      cleared: { marrow: true, liver: false, cns: false },
       best: { marrow: 760, liver: 300 },
     }));
     Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
     expect(loadProgress()).toEqual({
-      cleared: { marrow: true, liver: false },
+      cleared: { marrow: true, liver: false, cns: false },
       best: {
         marrow: { score: 760, response: 'CR' },
         liver: { score: 300, response: 'SD' },
+        cns: null,
       },
     });
   });
@@ -83,7 +84,7 @@ describe('level response persistence', () => {
     expect(loadProgress().best.marrow).toEqual({ score: 684, response: 'VGPR' });
 
     storage.setItem('marrow-defense:progress', JSON.stringify({ best: { marrow: 'bad', liver: { score: -2 } } }));
-    expect(loadProgress().best).toEqual({ marrow: null, liver: null });
+    expect(loadProgress().best).toEqual({ marrow: null, liver: null, cns: null });
   });
 
   it('ranks response before score and score within an equal response', () => {

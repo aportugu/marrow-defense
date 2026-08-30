@@ -5,6 +5,7 @@ import { ENEMY, UNIT } from '../game/Balance';
 import { LEVELS, wavesForLevel } from '../data/levels';
 import { wavePreview } from '../data/waves';
 import { WAVE_TITLES } from '../data/education';
+import { CNS_ANATOMY_LABELS } from '../data/cnsAtlas';
 import { computedTowerStats } from '../systems/CombatSystem';
 import { NoticeQueue } from './NoticeQueue';
 import { el } from './dom';
@@ -17,6 +18,7 @@ export class StageView {
   private tooltip = el('div', 'tooltip hidden');
   private notice = el('div', 'notice level-info hidden');
   private iecPanel = el('div', 'iec-panel hidden');
+  private cnsAnatomy = el('ul', 'cns-anatomy-a11y sr-only');
   private notices = new NoticeQueue();
   private lastNoticeKey = '';
   private lastBannerKey = '';
@@ -29,7 +31,9 @@ export class StageView {
     this.notice.setAttribute('role', 'status'); this.notice.setAttribute('aria-live', 'polite');
     this.iecPanel.setAttribute('role', 'status'); this.iecPanel.setAttribute('aria-live', 'polite');
     this.popup.setAttribute('role', 'dialog'); this.popup.setAttribute('aria-label', 'Selected unit details');
-    this.root.append(this.canvas, this.banner, this.tooltip, this.notice, this.iecPanel);
+    this.cnsAnatomy.setAttribute('aria-label', 'Keyboard-accessible Neuroaxis anatomy labels');
+    for (const label of CNS_ANATOMY_LABELS) { const item = el('li', undefined, label); item.tabIndex = 0; this.cnsAnatomy.appendChild(item); }
+    this.root.append(this.canvas, this.banner, this.tooltip, this.notice, this.iecPanel, this.cnsAnatomy);
     this.wireCanvas();
   }
 
@@ -129,24 +133,28 @@ export class StageView {
       const preview = wavePreview(wavesForLevel(state.level)[state.wave - 1]);
       const chips = (Object.keys(preview) as EnemyTypeId[]).filter((id) => preview[id] > 0).map((id) => `<span class="chip c-${id}">${preview[id]} ${ENEMY[id].icon}</span>`).join('');
       const wave = wavesForLevel(state.level)[state.wave - 1]; const behaviors = new Set(wave.groups.map((group) => group.behavior).filter(Boolean));
-      const special = state.level === 'liver' ? `${wave.events?.length ? '<span class="chip hepatic-threat">SURGE EVENT</span>' : ''}${behaviors.has('mitotic') ? '<span class="chip hepatic-threat">MITOTIC</span>' : ''}${behaviors.has('obstruction') ? '<span class="chip hepatic-threat">OBSTRUCTION</span>' : ''}${state.wave === 10 ? '<span class="chip hepatic-threat">3-PHASE CORE</span>' : ''}` : '';
-      const report = state.lastWaveReport ? `<div class="wave-report">Wave ${state.lastWaveReport.wave}: ${state.lastWaveReport.kills} cleared · ${state.lastWaveReport.escapes} escaped · +${state.lastWaveReport.fundingEarned} funding · peaks CRS/ICANS/IEC-HS/HEM ${state.lastWaveReport.peakCrs}/${state.lastWaveReport.peakNeuro}/${state.lastWaveReport.peakHyperinflammation}/${state.lastWaveReport.peakHematotoxicity}</div>` : '';
+      const special = state.level === 'liver' ? `${wave.events?.length ? '<span class="chip hepatic-threat">SURGE EVENT</span>' : ''}${behaviors.has('mitotic') ? '<span class="chip hepatic-threat">MITOTIC</span>' : ''}${behaviors.has('obstruction') ? '<span class="chip hepatic-threat">OBSTRUCTION</span>' : ''}${state.wave === 10 ? '<span class="chip hepatic-threat">3-PHASE CORE</span>' : ''}` : state.level === 'cns' ? `${wave.cnsBreaches?.map((breach) => `<span class="chip cns-threat">${breach.interface === 'bloodCsf' ? 'VENT' : breach.interface === 'bbb' ? 'BBB' : 'PIA'} BREACH</span>`).join('') ?? ''}${state.wave === 10 ? '<span class="chip cns-threat">3 SANCTUARIES · CORE</span>' : ''}` : '';
+      const report = state.lastWaveReport ? `<div class="wave-report">Wave ${state.lastWaveReport.wave}: ${state.lastWaveReport.kills} cleared · ${state.lastWaveReport.escapes} escaped · +${state.lastWaveReport.fundingEarned} funding · peaks CRS/ICANS/IEC-HS/HEM${state.level === 'cns' ? '/CNS' : ''} ${state.lastWaveReport.peakCrs}/${state.lastWaveReport.peakNeuro}/${state.lastWaveReport.peakHyperinflammation}/${state.lastWaveReport.peakHematotoxicity}${state.level === 'cns' ? `/${state.lastWaveReport.peakCnsBurden}` : ''}</div>` : '';
       const title = WAVE_TITLES[state.level][state.wave];
       const guidedConstruction = state.onboarding.active && (state.onboarding.hint === 'chooseUnit' || state.onboarding.hint === 'placeUnit' || state.onboarding.hint === 'reinforce');
       const placing = state.onboarding.hint === 'placeUnit' || state.onboarding.hint === 'reinforce';
       const hint = placing ? '<div class="placement-hint">GREEN BAND = EFFECTIVE PLACEMENT RANGE</div>' : '';
       const briefing = state.level === 'liver' && state.wave === 1 ? '<div class="hepatic-briefing"><b>CLEAR INVADING PLASMA-CELL CLUSTERS FROM THE LIVER</b><span>PORTAL VEIN · HEPATIC ARTERY · BILIARY BRANCH</span></div>' : '';
+      const cnsBriefing = state.level === 'cns' && state.wave === 1 ? '<div class="cns-briefing"><b>DEFEND THREE DISTINCT CNS INTERFACES</b><span>BBB ≠ BLOOD–CSF BARRIER ≠ LEPTOMENINGEAL ENTRY</span></div>' : '';
       const timing = guidedConstruction ? '<b>WAITING FOR CONSTRUCTION</b>' : `IN <b>${seconds}s</b>`;
-      this.banner.innerHTML = `${guidedHint}${report}${briefing}<div class="b-line">WAVE ${state.wave}${title ? ` · ${title}` : ''} ${timing}</div><div class="b-chips">${chips}${special}</div>${hint}<button class="btn small${state.onboarding.hint === 'startWave' ? ' hint' : ''}"${guidedConstruction ? ' disabled' : ''}>${guidedConstruction ? 'Build to continue' : 'Start now'}</button>`;
+      this.banner.innerHTML = `${guidedHint}${report}${briefing}${cnsBriefing}<div class="b-line">WAVE ${state.wave}${title ? ` · ${title}` : ''} ${timing}</div><div class="b-chips">${chips}${special}</div>${hint}<button class="btn small${state.onboarding.hint === 'startWave' ? ' hint' : ''}"${guidedConstruction ? ' disabled' : ''}>${guidedConstruction ? 'Build to continue' : 'Start now'}</button>`;
       this.banner.querySelector<HTMLButtonElement>('.btn.small')!.addEventListener('click', () => this.game.startWaveNow());
       return;
     }
     const event = state.activeHepaticEvent; const seconds = event ? Math.max(0, Math.ceil(event.remaining)) : 0;
-    const key = `${state.level}-w${state.wave}-${event?.id ?? 0}-${event?.stage ?? ''}-${seconds}`;
+    const cnsEvents = state.activeCnsBreaches;
+    const key = `${state.level}-w${state.wave}-${event?.id ?? 0}-${event?.stage ?? ''}-${seconds}-${cnsEvents.map((breach) => `${breach.id}:${breach.stage}:${Math.ceil(breach.remaining)}:${breach.contained}`).join('|')}`;
     if (key === this.lastBannerKey) return;
     this.lastBannerKey = key; const title = WAVE_TITLES[state.level][state.wave];
     const eventLabel = event ? `<div class="hepatic-event ${event.stage}"><b>${event.stage === 'warning' ? 'PLASMA-CELL SURGE' : 'SURGE ACTIVE'} — ${LEVELS.liver.lanes[event.lane].name.toUpperCase()}</b>${event.stage === 'warning' ? `<span>IMPACT IN ${seconds}s</span>` : ''}</div>` : '';
-    this.banner.innerHTML = `${guidedHint}${eventLabel}<div class="b-line big">WAVE ${Math.min(state.wave, state.wavesTotal)}${title ? ` · ${title}` : ''}</div>`;
+    const cnsNames = { bloodCsf: 'CONTAIN CHOROID PLEXUS ENTRY', bbb: 'CONTAIN CORTICAL BBB BREACH', leptomeningeal: 'CONTAIN LEPTOMENINGEAL ENTRY' } as const;
+    const cnsLabel = cnsEvents.map((breach) => `<div class="cns-event ${breach.stage} route-${breach.interface}"><span class="route-symbol" aria-hidden="true">${breach.interface === 'bloodCsf' ? 'VENT' : breach.interface === 'bbb' ? 'BBB' : 'PIA'}</span><b>${cnsNames[breach.interface]}</b><span>${breach.contained ? 'CONTAINED · DELAYED' : breach.stage === 'warning' ? `${Math.max(0, Math.ceil(breach.remaining))}s · R CONTAINS MOST IMMINENT` : 'BREACH ACTIVE'}</span></div>`).join('');
+    this.banner.innerHTML = `${guidedHint}${eventLabel}${cnsLabel}<div class="b-line big">WAVE ${Math.min(state.wave, state.wavesTotal)}${title ? ` · ${title}` : ''}</div>`;
   }
 
   private placePopup(x: number, y: number): void {
@@ -181,7 +189,10 @@ export class StageView {
   update(state: GameState): void {
     this.updateNotice(state);
     const event = state.activeHepaticEvent ? `, ${state.activeHepaticEvent.stage === 'warning' ? 'incoming' : 'active'} plasma-cell surge in ${LEVELS.liver.lanes[state.activeHepaticEvent.lane].name}` : '';
-    this.canvas.setAttribute('aria-label', state.level === 'liver' ? `Advanced hepatic plasmacytoma defense battlefield with portal, arterial, and biliary lanes${event}` : 'Bone marrow defense battlefield');
+    const cnsEvent = state.activeCnsBreaches.map((breach) => `${breach.stage} ${breach.interface} event`).join(', ');
+    this.canvas.setAttribute('aria-label', state.level === 'liver' ? `Advanced hepatic plasmacytoma defense battlefield with portal, arterial, and biliary lanes${event}` : state.level === 'cns' ? `Expert Neuroaxis CNS myeloma battlefield. Distinct cortical blood-brain barrier, choroid plexus blood-CSF, and pial leptomeningeal routes. ${cnsEvent}` : 'Bone marrow defense battlefield');
+    this.cnsAnatomy.setAttribute('aria-hidden', String(state.level !== 'cns'));
+    for (const item of this.cnsAnatomy.children) (item as HTMLElement).tabIndex = state.level === 'cns' ? 0 : -1;
     if (state.iecHsUnlocked) {
       this.iecPanel.innerHTML = `<div class="iec-title">IEC-HS · HYPERINFLAMMATION <b>${Math.round(state.meters.hyperinflammation)}</b></div><div class="iec-track"><span style="width:${state.meters.hyperinflammation}%"></span></div><div class="iec-status"><b>IEC-HS ACTIVE</b>${state.stats.time < state.anakinraUntil ? '<span>IL-1 BLOCKADE</span>' : ''}${state.stats.time < state.iecHsDexaUntil ? '<span>STEROID EFFECT</span>' : ''}</div>`;
       this.iecPanel.classList.remove('hidden');

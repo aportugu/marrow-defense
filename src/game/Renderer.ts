@@ -178,6 +178,94 @@ function drawHepaticEventLayer(ctx: CanvasRenderingContext2D, s: GameState, path
   ctx.restore();
 }
 
+function strokePolyline(ctx: CanvasRenderingContext2D, points: ReadonlyArray<Vec>): void {
+  ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+  for (const point of points.slice(1)) ctx.lineTo(point.x, point.y);
+  ctx.stroke();
+}
+
+function drawArrow(ctx: CanvasRenderingContext2D, from: Vec, to: Vec): void {
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(to.x, to.y);
+  ctx.lineTo(to.x - Math.cos(angle - .55) * 7, to.y - Math.sin(angle - .55) * 7);
+  ctx.lineTo(to.x - Math.cos(angle + .55) * 7, to.y - Math.sin(angle + .55) * 7);
+  ctx.closePath(); ctx.fill();
+}
+
+function drawNormalCsfFlow(ctx: CanvasRenderingContext2D, time: number, reduced: boolean): void {
+  const points: Vec[] = [
+    { x: 418, y: 305 }, { x: 510, y: 296 }, { x: 575, y: 320 }, { x: 640, y: 348 },
+    { x: 688, y: 377 }, { x: 741, y: 414 }, { x: 814, y: 446 }, { x: 895, y: 466 },
+  ];
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(125,211,252,.7)'; ctx.fillStyle = '#bae6fd'; ctx.lineWidth = 2.2;
+  ctx.setLineDash([10, 8]); ctx.lineDashOffset = reduced ? 0 : -time * 18;
+  strokePolyline(ctx, points); ctx.setLineDash([]);
+  for (let index = 1; index < points.length; index += 2) drawArrow(ctx, points[index - 1], points[index]);
+  ctx.font = '800 10px system-ui, sans-serif'; ctx.fillStyle = '#bae6fd';
+  ctx.fillText('NORMAL CSF FLOW', 492, 268);
+  ctx.restore();
+}
+
+function drawCnsRouteLayer(ctx: CanvasRenderingContext2D, s: GameState, paths: PathDef[], time: number, reduced: boolean): void {
+  const activeLanes = new Set(s.activeCnsBreaches.map((event) => event.lane));
+  const routeNames = ['BBB / PERIVASCULAR', 'CHOROID / VENTRICULAR', 'PIAL / LEPTOMENINGEAL'];
+  const symbols = ['BBB', 'VENT', 'PIA'];
+  const dash = [[3, 9], [12, 6], [18, 5, 3, 5]];
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let index = 0; index < paths.length; index++) {
+    const active = activeLanes.has(index);
+    const pulse = reduced ? .7 : .72 + Math.sin(time * 8 + index) * .22;
+    ctx.strokeStyle = active ? `rgba(244,114,182,${pulse})` : 'rgba(196,181,253,.18)';
+    ctx.shadowColor = active ? '#f472b6' : 'transparent'; ctx.shadowBlur = active ? 24 : 0;
+    ctx.lineWidth = active ? 9 : 3;
+    ctx.setLineDash(dash[index]); ctx.lineDashOffset = reduced ? 0 : -time * (18 + index * 5);
+    strokePolyline(ctx, paths[index].points);
+    const marker = posAt(paths[index], 118);
+    ctx.setLineDash([]); ctx.shadowBlur = 0;
+    ctx.fillStyle = active ? '#fdf2f8' : 'rgba(226,232,240,.72)';
+    ctx.font = '900 9px system-ui, sans-serif';
+    ctx.fillText(`${symbols[index]} · ${routeNames[index]}`, marker.x + 8, marker.y - 13);
+  }
+  ctx.restore();
+}
+
+const CNS_LABELS: ReadonlyArray<{ text: string; x: number; y: number; tx: number; ty: number }> = [
+  { text: 'ARACHNOID GRANULATIONS', x: 268, y: 76, tx: 360, ty: 90 },
+  { text: 'SUPERIOR SAGITTAL SINUS', x: 450, y: 48, tx: 540, ty: 74 },
+  { text: 'CEREBRAL SUBARACHNOID SPACE', x: 636, y: 83, tx: 718, ty: 115 },
+  { text: 'PENETRATING CORTICAL VESSEL', x: 710, y: 157, tx: 746, ty: 205 },
+  { text: 'PERIVASCULAR SPACE', x: 750, y: 236, tx: 782, ty: 272 },
+  { text: 'CHOROID PLEXUS', x: 298, y: 262, tx: 427, ty: 301 },
+  { text: 'LATERAL VENTRICLE', x: 322, y: 337, tx: 452, ty: 311 },
+  { text: 'FORAMEN OF MONRO', x: 450, y: 376, tx: 522, ty: 316 },
+  { text: 'THIRD VENTRICLE', x: 532, y: 404, tx: 575, ty: 336 },
+  { text: 'CEREBRAL AQUEDUCT', x: 622, y: 444, tx: 651, ty: 359 },
+  { text: 'FOURTH VENTRICLE', x: 694, y: 486, tx: 715, ty: 402 },
+  { text: 'MAGENDIE / LUSCHKA', x: 780, y: 515, tx: 766, ty: 434 },
+  { text: 'BASAL CISTERNS', x: 850, y: 500, tx: 829, ty: 455 },
+  { text: 'FORAMEN MAGNUM', x: 866, y: 560, tx: 931, ty: 487 },
+  { text: 'SPINAL SUBARACHNOID SPACE', x: 973, y: 344, tx: 1024, ty: 382 },
+  { text: 'CONUS MEDULLARIS', x: 969, y: 496, tx: 1080, ty: 526 },
+  { text: 'LUMBAR CISTERN', x: 970, y: 570, tx: 1102, ty: 582 },
+  { text: 'CAUDA EQUINA', x: 970, y: 624, tx: 1120, ty: 616 },
+];
+
+function drawCnsLabels(ctx: CanvasRenderingContext2D): void {
+  ctx.save(); ctx.font = '700 8px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+  for (const label of CNS_LABELS) {
+    const width = ctx.measureText(label.text).width;
+    ctx.strokeStyle = 'rgba(186,230,253,.42)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(label.x + width / 2, label.y + (label.y < label.ty ? 7 : -7)); ctx.lineTo(label.tx, label.ty); ctx.stroke();
+    ctx.fillStyle = 'rgba(4,12,26,.78)'; ctx.fillRect(label.x - 4, label.y - 7, width + 8, 14);
+    ctx.fillStyle = '#dbeafe'; ctx.fillText(label.text, label.x, label.y);
+  }
+  ctx.fillStyle = '#c4b5fd'; ctx.font = '900 9px system-ui, sans-serif';
+  ctx.fillText('SPINAL INSET · SEPARATELY SCALED', 970, 326);
+  ctx.restore();
+}
+
 function drawEnemy(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -249,7 +337,7 @@ function drawEnemy(
         : type === 'highBurden'
           ? { count: 8, cell: size * .43, spread: size * .72, alpha: .96 }
           : { count: 13, cell: size * .31, spread: size * .77, alpha: .98 };
-  const ring = type === 'bcmaLow' ? '#94a3b8' : type === 'hepaticCore' ? '#f5d0fe' : color;
+  const ring = type === 'bcmaLow' ? '#94a3b8' : type === 'hepaticCore' || type === 'parenchymalCore' ? '#f5d0fe' : color;
   const receptors = receptorCountForEnemy(type);
   ctx.globalAlpha = cluster.alpha;
   for (let i = 0; i < cluster.count; i++) {
@@ -285,7 +373,7 @@ function drawEnemy(
     }
     ctx.restore();
   }
-  if (type === 'hepaticCore') {
+  if (type === 'hepaticCore' || type === 'parenchymalCore') {
     ctx.strokeStyle = '#f0abfc';
     ctx.lineWidth = 3;
     ctx.setLineDash([5, 4]);
@@ -304,6 +392,10 @@ function drawEnemy(
         ctx.stroke();
       }
     }
+  }
+  if (type === 'sanctuaryDeposit' || behavior === 'sanctuary') {
+    ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.arc(0, 0, size + 8 + Math.sin(time * 2) * 2, 0, Math.PI * 2); ctx.stroke();
   }
   ctx.restore();
 
@@ -344,7 +436,7 @@ function drawHepaticLabels(ctx: CanvasRenderingContext2D, paths: PathDef[]): voi
 }
 
 function drawBossHud(ctx: CanvasRenderingContext2D, s: GameState): void {
-  const boss = s.enemies.find((enemy) => enemy.alive && enemy.type === 'hepaticCore');
+  const boss = s.enemies.find((enemy) => enemy.alive && (enemy.type === 'hepaticCore' || enemy.type === 'parenchymalCore'));
   if (!boss) return;
   const x = 430;
   const y = 22;
@@ -359,8 +451,11 @@ function drawBossHud(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.fillStyle = '#f5d0fe';
   ctx.font = '800 11px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  const shielded = s.enemies.some((enemy) => enemy.alive && enemy.behavior === 'bossEscort' && enemy.parentBossId === boss.id);
-  ctx.fillText(`HEPATIC PLASMACYTOMA CORE · PHASE ${boss.bossPhase ?? 1}${shielded ? ' · SHIELDED' : ''}`, x + w / 2, y);
+  const shielded = boss.type === 'parenchymalCore'
+    ? s.enemies.some((enemy) => enemy.alive && enemy.type === 'sanctuaryDeposit')
+    : s.enemies.some((enemy) => enemy.alive && enemy.behavior === 'bossEscort' && enemy.parentBossId === boss.id);
+  const name = boss.type === 'parenchymalCore' ? 'PERIVENTRICULAR PARENCHYMAL CORE' : 'HEPATIC PLASMACYTOMA CORE';
+  ctx.fillText(`${name} · PHASE ${boss.bossPhase ?? 1}${shielded ? ' · SANCTUARY SHIELD' : ''}`, x + w / 2, y);
   ctx.fillStyle = 'rgba(255,255,255,.1)';
   ctx.fillRect(x, y + 10, w, 9);
   const grad = ctx.createLinearGradient(x, 0, x + w, 0);
@@ -570,6 +665,10 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState, v: View): vo
     v.kinetic.render(ctx, v.time, v.paths, v.kineticSignals);
     const laneColors = LEVELS[s.level].lanes.map((lane) => lane.color);
     if (s.level === 'liver') drawHepaticEventLayer(ctx, s, v.paths, time, v.kineticSignals.reducedMotion);
+    if (s.level === 'cns') {
+      drawNormalCsfFlow(ctx, time, v.kineticSignals.reducedMotion);
+      drawCnsRouteLayer(ctx, s, v.paths, time, v.kineticSignals.reducedMotion);
+    }
     const guidedConstruction = s.onboarding.active
       && (s.onboarding.hint === 'placeUnit' || s.onboarding.hint === 'reinforce');
     if (guidedConstruction && v.buildType) drawGuidedPlacementBand(ctx, v.paths, v.buildType);
@@ -577,6 +676,7 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState, v: View): vo
       drawPath(ctx, v.paths[i], time, laneColors[i % laneColors.length]);
     }
     if (s.level === 'liver') drawHepaticLabels(ctx, v.paths);
+    if (s.level === 'cns') drawCnsLabels(ctx);
     for (const t of s.towers) drawTower(ctx, t, v.selectedTower === t.id, time, s.stats.time < s.dexaUntil, s.subPhase === 'planning', v.kineticSignals.reducedMotion);
     for (const e of s.enemies) {
       if (!e.alive || e.behavior !== 'bossEscort' || e.parentBossId == null) continue;
@@ -595,6 +695,11 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState, v: View): vo
       if (!e.alive) continue;
       const def = ENEMY[e.type];
       drawEnemy(ctx, e.x, e.y, def.icon, def.color, def.size, e.hp / e.maxHp, e.type, e.behavior, e.bossPhase ?? 0, time);
+      if (e.sanctuarySite) {
+        const names = { ventricular: 'VENTRICULAR DEPOSIT', basalCisternal: 'BASAL-CISTERNAL DEPOSIT', lumbarCistern: 'LUMBAR-CISTERN DEPOSIT' } as const;
+        ctx.save(); ctx.font = '800 8px system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#f5d0fe'; ctx.fillText(names[e.sanctuarySite], e.x, e.y - def.size - 15); ctx.restore();
+      }
     }
     for (const p of s.projectiles) {
       const def = UNIT[p.unit];
